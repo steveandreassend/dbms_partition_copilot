@@ -17,4 +17,4 @@ Why:
 * Because there is no consistency in how data controllers and data processors handle bulk data. It is difficult to follow best practices and this project provides an easy way to adopt them.
 * Entities may be out of compliance with data privacy legislation such as GDPR. Mass data leaks are occurring regularly and they often concern data that should not have have been retained once it is no longer of use.
 * To reduce the energy footprint of storing and processing bulk data by avoiding unnecessary and excessive resource consumption.
-* To encourage the use of essential security controls. In 2018 it was claimed by one commentator that only 1% of the databases in the world are encrpyted.
+* In 2018 it was claimed by one commentator that only 1% of the databases in the world are encrpyted.
