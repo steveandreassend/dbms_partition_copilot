@@ -23,14 +23,17 @@ Why:
 * Why FOSS? This project is intended as a benefit to a society and so the code can be subject to scrutiny, testing, contributions, and adoption by the community. It is provided here under the MIT license.
 
 How:
+
 This package provides an opinionated design for managing RANGE partitions in a package called DBMS_PARTITION_WRANGLER.
 RANGE partitioning is the most common partitioning method employed in the field. It can be combined with sub-partitioning with LIST and HASH partitioning whereby the top-level RANGE partitioning provides the metadata, and the sub-partitionins provide the physical storage. The intention wit this API is to leverage Oracle's built-in capabilities and in some cases improve upon the newer extensions provided.
 See the worked examples in Examples.txt to learn how to use DBMS_PARTITION_WRANGLER.
 
 Compatibility:
+
 This package is intended to work with versions 12.1 and higher. Some newer features will be detected and leveraged where necessary.
 As newer versions of Oracle Database are released with new partitioning features, this framework will need to be revised.
 
 Background Notes:
+
 What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
 What is a wrangler: https://en.wikipedia.org/wiki/Wrangler_(profession)
