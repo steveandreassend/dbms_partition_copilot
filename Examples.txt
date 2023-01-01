@@ -1,0 +1,172 @@
+sqlplus / AS SYSDBA
+
+PROMPT Grant access to the user that stores the schema objects for the application
+GRANT DBMS_PARTITION_WRANGLER_ADMIN TO MYSCHEMA1;
+
+CONNECT MYSCHEMA1/
+
+PROMPT What version is installed?
+SELECT dbms_partition_wrangler.get_version FROM DUAL;
+
+PROMPT A range partitioned table MYPARTTAB1 already exists
+
+SET SERVEROUTPUT ON SIZE 32000
+
+PROMPT Register the table and set parameters
+BEGIN
+  -- Register the table
+  dbms_partition_wrangler.register_table('MYSCHEMA1','MYPARTTAB1');
+
+  -- All partitions and tablespaces are named MYPARTTAB1_WW_YYYY
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'NAME_PREFIX',
+    p_value        => 'MYPARTTAB1'
+  );
+
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'MANAGED',
+    p_value        => 'Y'
+  );
+
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'TABLE_RANGE_TYPE',
+    p_value        => 'WEEKLY'
+  );
+
+  -- Store each partition in a dedicated tablespace
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'TABLESPACE_RANGE_TYPE',
+    p_value        => 'WEEKLY'
+  );
+
+  -- Store partitions in the +DATA ASM disk group
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'ACTIVE_ASM_DISKGROUP',
+    p_value        => '+DATA'
+  );
+
+  -- When partitions become inactive, move them to the +DATA2 ASM disk group
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'INACTIVE_ASM_DISKGROUP',
+    p_value        => '+DATA2'
+  );
+
+  -- Make sure there is always 2 weeks of partitions pre-allocated
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'PREALLOCATED_PARTITIONS',
+    p_value        => '2'
+  );
+
+  -- Retain 12 weeks of inactive partitions
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'INACTIVE_PARTITIONS',
+    p_value        => '12'
+  );
+
+  -- Compress inactive partitions
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'COMPRESSION_INACTIVE',
+    p_value        => 'COMPRESS FOR ALL OPERATIONS'
+  );
+
+  -- Compress active and pre-allocated partitions
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'COMPRESSION_ACTIVE',
+    p_value        => 'COMPRESS FOR ALL OPERATIONS'
+  );
+
+  -- New BIGFILE tablespaces are created with a starting size of 1G
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'TABLESPACE_MINSIZE',
+    p_value        => '1G'
+  );
+
+  -- All DDL operations to manage partitions use parallelism degree 16
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'DDL_PARALLEL_DEGREE',
+    p_value        => '16'
+  );
+
+  -- When partitions become inactive, set the tablespace to read-only so that RMAN only backs it up once
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'READONLY_INACTIVE',
+    p_value        => 'Y'
+  );
+
+  -- activate the management of the table and create the automatic maintenance jobs
+  dbms_partition_wrangler.set_managed_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1'
+  );
+
+END;
+/
+
+PROMPT Get configuration settings and DBMS_SCHEDULER jobs for this table
+EXECUTE dbms_partition_wrangler.report_table('MYSCHEMA1','MYPARTTAB1');
+
+PROMPT Verify the configuration
+DECLARE
+  l_out INTEGER;
+BEGIN
+  dbms_partition_wrangler.check_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1'
+    p_return_code  => l_out
+  );
+  dbms_output.put_line(l_out);
+END;
+/
+
+PROMPT Count preallocated partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count historical partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count active partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count active partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Manually run the add and drop of partitions
+EXECUTE dbms_partition_wrangler.process_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count preallocated partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count historical partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count active partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+
+PROMPT Count active partitions for a specified managed table
+SELECT dbms_partition_wrangler.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
