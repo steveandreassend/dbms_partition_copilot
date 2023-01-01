@@ -64,6 +64,7 @@ Restrictions:
 * Mandates the usage of ASM for data storage.
 * Mandates the usage of BIGFILE tablespaces.
 * Excludes the use of Reference Partitioning. You should consider not using primary keys or foreign keys on range partitioned tables.
+* Excludes the use of SPLIT and MERGE partitions.
 
 Background Notes:
 
