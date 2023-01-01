@@ -58,6 +58,7 @@ Features:
 * Support ENABLE ROW MOVEMENT (updates to the partition key) by setting different schedules for READ ONLY and COMPRESS operations for inactive partitions.
 * Provide diagnostics by checking the partitioning configuration.
 * Provide recommendations by checking the partitioning configuration. For instance the optimal DBMS_STATS settings.
+* Provide the ability to utilize parallel DDL to speed up operations such as COMPRESS.
 
 Restrictions:
 
