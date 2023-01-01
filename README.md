@@ -36,8 +36,8 @@ This package is intended to work with Oracle Database versions 12.1 and higher. 
 
 Features:
 
-* Provide the ability to automatically drop partitions based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement.
-* Provide the ability to automatically truncate partitions and shrink tablespace storage based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement.
+* Provide the ability to automatically drop partitions based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement. A partition drop is fast and does not generate redo to purge data.
+* Provide the ability to automatically truncate partitions and shrink tablespace storage based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement. This is an alternative option to dropping partitions.
 * Provide the ability to automatically compress partitions when they become inactive based upon a configurable compression setting. This reduces the storage costs by reducing the amount of data being stored. It also improves performance by reducing the amount of disk IO activity needed to read data.
 * Provide the ability to automatically make partitions and tablespaces READ-ONLY when they become inactive. This makes it possible to shrink the size of the RMAN backups by excluding READ-ONLY tablespaces.
 * Provide the ability to automatically move partitions to a different ASM Disk Group when they become inactive. This lowers storage cost by allowing cold partitions to be stored on cheaper storage hardware.
@@ -46,7 +46,18 @@ Features:
 * Provide the ability to use a custom DB_BLOCK_SIZE. For large transaction records it can be beneficial for performance use a 32KB block size instead of the default of 8KB because it requires 4x fewer disk IOPS to read the same amount of data.
 * Overcome the limitations of Internal Range Partitioning; e.g. use a partition naming scheme, use a better physical storage design, pre-allocate storage.
 * Enforce the usage of BIGFILE tablespaces to simplify capacity management.
-* ...
+* Provide the ability to specify configure TDE tablespace encryption to comply with security mandates such as GDPR and PCI-DSS.
+* Ensure that global indexes are maintained during partition COMPRESS, DROP, MOVE, TRUNCATE operations.
+* Provide the option to utilize Internal Range Partitioning, but still make use of the partition archiving functionality.
+* Provide the abiluty to audit all partition maintenance activity.
+* Provide multiple user accounts to securely share the same API for managing partitions.
+* Send all partition maintenance events to the database alert log for traceability purposes.
+* Provide the ability to employ sub-partitioning using HASH or LIST partitioning to provide more granular physical storage.
+* Provide observability for managing all partition maintenance jobs through DBMS_SCHEDULER.
+* Provide reliability in Data Guard configurations by running all partition maintenance jobs through DBMS_SCHEDULER on the primary database.
+* Support ENABLE ROW MOVEMENT (updates to the partition key) by setting different schedules for READ ONLY and COMPRESS operations for inactive partitions.
+* Provide diagnostics by checking the partitioning configuration.
+* Provide recommendations by checking the partitioning configuration. For instance the optimal DBMS_STATS settings.
 
 Restrictions:
 
