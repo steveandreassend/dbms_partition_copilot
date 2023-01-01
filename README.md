@@ -13,6 +13,7 @@ Goals:
 Intended Audience:
 * Data processors and data controllers in retail, healthcare, telecommunications, utilities, transportation, hospitality, hotels, and financial services, among others, that more often than not store bulk personal data in an Oracle Database.
 * The data in scope concerns for example, your personal details, where you live and work, your personal contact details, your national ID, what you buy, where you buy, how much you spend, your entire medical history, who you communiucate with, the contents of your communications, the apps you use, the websites you visit, your energy consumption, where you dine-out and what you ordered, where you travel, where you stayed and what you consumed, your accounts and entire financial history, ....
+* Current employees of Oracle Corporation, or of its subsidiaries, or of its entities where it has a controlling interest, are specifically requested not to contribute any code to this project.
 
 Why:
 * Because there is no consistency in how data controllers and data processors handle bulk data. It is difficult to follow best practices and this project provides an easy way to adopt them.
