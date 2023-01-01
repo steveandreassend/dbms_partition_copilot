@@ -118,6 +118,22 @@ BEGIN
     p_parameter    => 'READONLY_INACTIVE',
     p_value        => 'Y'
   );
+  
+    -- Encryption for new tablespaces
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'TABLESPACE_ENCRYPTION',
+    p_value        => 'AES256'
+  );
+
+  -- Configure NOLOGGING for COMPRESS operations
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'REDO_LOGGING',
+    p_value        => 'NOLOGGING'
+  );
 
   -- activate the management of the table and create the automatic maintenance jobs
   dbms_partition_wrangler.set_managed_table(
