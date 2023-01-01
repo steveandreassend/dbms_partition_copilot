@@ -41,7 +41,9 @@ Features:
 * Provide the ability to automatically compress partitions when they become inactive based upon a configurable compression setting. This reduces the storage costs by reducing the amount of data being stored. It also improves performance by reducing the amount of disk IO activity needed to read data.
 * Provide the ability to automatically make partitions and tablespaces READ-ONLY when they become inactive. This makes it possible to shrink the size of the RMAN backups by excluding READ-ONLY tablespaces.
 * Provide the ability to automatically move partitions to a different ASM Disk Group when they become inactive. This lowers storage cost by allowing cold partitions to be stored on cheaper storage hardware.
-* Provide the ability to ensure partitions are stored in dedicated or rolled-up tablespaces. This provides manageability benefits.
+* Provide the ability to ensure partitions are stored in dedicated or rolled-up tablespaces. This provides the aforementioned manageability benefits.
+* Provide the ability to set a policy to store active and inactive partitions in different memory segments. This provides performance benefits by allowing active data to have a different memory entitlement than historical data. For instance active partitions can be configured to use DEFAULT or KEEP buffer caches, while inactive data can be stored in RECYCLE so that it is segregated and does not flush active partitions out of memory.
+* Provide the ability to use a custom DB_BLOCK_SIZE. For large transaction records it can be beneficial for performance use a 32KB block size instead of the default of 8KB because it requires 4x fewer disk IOPS to read the same amount of data.
 * Overcome the limitations of Internal Range Partitioning; e.g. use a partition naming scheme, use a better physical storage design, pre-allocate storage.
 * Enforce the usage of BIGFILE tablespaces to simplify capacity management.
 * ...
