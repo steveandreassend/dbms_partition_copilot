@@ -59,6 +59,8 @@ Compatibility:
 
 This package is intended to work with Oracle Database versions 12.1 and higher. Some newer features will be detected and leveraged where necessary. As newer versions of Oracle Database are released with new partitioning features, this framework will need to be revised. Users of this package are expected to review the code, test the functionality with their database release, adapt it as necessary, and assume all responsibility and liability for using it as per the stated terms of the MIT license.
 
+In future, it is hoped that the same functionality will be ported to Postgres and MySQL.
+
 Features:
 
 * Provide the ability to automatically drop partitions based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement. A partition drop is fast and does not generate redo to purge data.
