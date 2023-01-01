@@ -34,6 +34,24 @@ Compatibility:
 
 This package is intended to work with Oracle Database versions 12.1 and higher. Some newer features will be detected and leveraged where necessary. As newer versions of Oracle Database are released with new partitioning features, this framework will need to be revised. Users of this package are expected to review the code, test the functionality with their database release, adapt it as necessary, and assume all responsibility and liability for using it as per the stated terms of the MIT license.
 
+Features:
+
+* Provide the ability to automatically drop partitions based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement.
+* Provide the ability to automatically truncate partitions and shrink tablespace storage based upon a configurable retention period. This simplifies the operation and avoids the need for operator involvement.
+* Provide the ability to automatically compress partitions when they become inactive based upon a configurable compression setting. This reduces the storage costs by reducing the amount of data being stored. It also improves performance by reducing the amount of disk IO activity needed to read data.
+* Provide the ability to automatically make partitions and tablespaces READ-ONLY when they become inactive. This makes it possible to shrink the size of the RMAN backups by excluding READ-ONLY tablespaces.
+* Provide the ability to automatically move partitions to a different ASM Disk Group when they become inactive. This lowers storage cost by allowing cold partitions to be stored on cheaper storage hardware.
+* Provide the ability to ensure partitions are stored in dedicated or rolled-up tablespaces. This provides manageability benefits.
+* Overcome the limitations of Internal Range Partitioning; e.g. use a partition naming scheme, use a better physical storage design, pre-allocate storage.
+* Enforce the usage of BIGFILE tablespaces to simplify capacity management.
+* ...
+
+Restrictions:
+
+* Mandates the usage of ASM for data storage.
+* Mandates the usage of BIGFILE tablespaces.
+* Excludes the use of Reference Partitioning. You should consider not using primary keys or foreign keys on range partitioned tables.
+
 Background Notes:
 
 What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
