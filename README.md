@@ -20,6 +20,7 @@ Why:
 * Entities may be out of compliance with data privacy legislation such as GDPR. Mass data leaks are occurring regularly and they often concern data that should not have have been retained once it is no longer of use.
 * To reduce the energy footprint of storing and processing bulk data by avoiding unnecessary and excessive resource consumption. Data centers are large energy consumers and in many countries they are powered by fossil fuels, responsible for an estimated 3% of greenhouse gas emissions.
 * Most databases are not secure. In 2018 it was claimed by one commentator that only 1% of the databases in the world are encrypted.
+* Because partitioning offers the potential for performance gains in the orders of magnitude by shrinking the size of the working data set size.
 * Why a wrangler? Because partitions need to be managed with care. Handling must be orchestrated by policy and fully automated to prevent human error.
 * Why FOSS? This project is intended as a benefit to a society and so the code can be subject to scrutiny, testing, contributions, and adoption by the community. It is provided here under the MIT license.
 
