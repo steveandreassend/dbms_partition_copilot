@@ -134,6 +134,22 @@ BEGIN
     p_parameter    => 'REDO_LOGGING',
     p_value        => 'NOLOGGING'
   );
+  
+    -- Specify a 7 day delay for compression to be applied after a partition becomes inactive
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'COMPRESS_DELAY_DAYS',
+    p_value        => '7'
+  );
+
+  -- Permit ENABLE ROW MOVEMENT for up to 21 days after a partition becomes inactive
+  dbms_partition_wrangler.modify_table(
+    p_table_owner  => 'MYSCHEMA1',
+    p_table_name   => 'MYPARTTAB1',
+    p_parameter    => 'READONLY_DELAY_DAYS',
+    p_value        => '21'
+  );
 
   -- activate the management of the table and create the automatic maintenance jobs
   dbms_partition_wrangler.set_managed_table(
