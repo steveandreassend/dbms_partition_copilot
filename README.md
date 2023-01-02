@@ -76,7 +76,7 @@ Features:
 * Provide the ability to specify configure TDE tablespace encryption to comply with security mandates such as GDPR and PCI-DSS.
 * Ensure that global indexes are maintained during partition COMPRESS, DROP, MOVE, TRUNCATE operations.
 * Provide the option to utilize Internal Range Partitioning, but still make use of the partition archiving functionality.
-* Provide the abiluty to audit all partition maintenance activity.
+* Provide the ability to audit all partition maintenance activity.
 * Provide multiple user accounts to securely share the same API for managing partitions.
 * Send all partition maintenance events to the database alert log for traceability purposes.
 * Provide the ability to employ sub-partitioning using HASH or LIST partitioning to provide more granular physical storage.
@@ -92,7 +92,7 @@ Restrictions:
 * Mandates the usage of ASM for data storage.
 * Mandates the usage of BIGFILE tablespaces.
 * Excludes the use of Reference Partitioning. You should consider not using primary keys or foreign keys on range partitioned tables.
-* Excludes the use of SPLIT and MERGE partitions.
+* Excludes the use of SPLIT and MERGE partitions. This will confuse the interval calculations.
 
 Background Notes:
 
