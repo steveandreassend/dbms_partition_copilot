@@ -37,6 +37,28 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     dbms_system.ksdwrt(1,'ACTION:'||p_action||' - MESSAGE:'||p_message);
   END log_event;
 
+  FUNCTION is_parameter(
+    p_parameter IN VARCHAR2
+  ) RETURN BOOLEAN
+    l_count INTEGER;
+  BEGIN
+    --Checks
+    IF NOT is_valid_string(p_string => p_parameter) THEN
+      raise_application_error(-20000,'Invalid string for p_parameter');
+    END IF;
+
+    SELECT COUNT(1) INTO l_count
+    FROM dbms_partition_wrangler_parms
+    WHERE PARAMETER_NAME = UPPER(p_parameter);
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+
+  END is_parameter;
+
   --returns the specified setting for the table
   FUNCTION get_parameter(
     p_table_owner     IN VARCHAR2,
@@ -64,6 +86,25 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     RETURN l_return;
 
   END get_parameter;
+
+  --checks if parameter can be null
+  FUNCTION is_parameter_nullable(
+    p_parameter IN VARCHAR2
+  ) RETURN BOOLEAN
+    l_count INTEGER;
+  IS
+  BEGIN
+    /* REVIEW: does mandatory mean nullable??? or do we newed a nullable setting */
+    SELECT COUNT(1) INTO l_count
+    FROM dbms_partition_wrangler_parms
+    WHERE mandatory = 'Y';
+
+    IF l_count > 0 THEN
+      RETURN FALSE;
+    ELSE
+      RETUR TRUE;
+    END IF;
+  END is_parameter_nullable;
 
   -- generate a lock name based upon table owner and table name
   FUNCTION get_lock_name(
@@ -331,10 +372,60 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2,
     p_parameter       IN VARCHAR2,
-    p_value           IN VARCHAR2
+    p_value           IN VARCHAR2 DEFAULT NULL
   ) IS
   BEGIN
-    NULL;
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+    IF NOT is_valid_string(p_string => p_parameter) THEN
+      raise_application_error(-20000,'Invalid value for p_parameter');
+    END IF;
+
+    IF p_value IS NOT NULL THEN
+      IF NOT is_valid_string(p_string => p_value) THEN
+        raise_application_error(-20000,'Invalid value for p_value');
+      END IF;
+    ELSE
+      IF NOT is_parameter_nullable(p_parameter) THEN
+        raise_application_error(-20000,'Parameter '||p_parameter||' cannot be null');
+      END IF;
+    END IF;
+
+    IF NOT is_registered_table(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+      raise_application_error(-20000,'Table is not registered');
+    END IF;
+
+    IF NOT is_range_partitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+      raise_application_error(-20000,'Table is not partitioned');
+    END IF;
+
+    IF NOT is_parameter(p_parameter => p_parameter) THEN
+      raise_application_error(-20000,'Invalid parameter specified');
+    END IF;
+
+    --get input parameters
+    l_parameter_id := get_parameter_id(p_parameter);
+    l_table_id := get_table_id(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    MERGE INTO dbms_partition_wrangler_settings
+    USING source_table
+      ON search_condition
+    WHEN MATCHED THEN
+        UPDATE SET SETTING = p_value
+        WHERE PARAMETER_ID = l_parameter_id
+        AND table_id = l_table_id;
+    WHEN NOT MATCHED THEN
+        INSERT (col1,col2,...)
+        VALUES(value1,value2,...);
+    COMMIT;
+
+    --log
+
   END modify_table;
 
   /*
