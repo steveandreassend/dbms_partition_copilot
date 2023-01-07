@@ -87,7 +87,7 @@ Features:
 * Provide recommendations by checking the partitioning configuration. For instance the optimal DBMS_STATS settings.
 * Provide the ability to utilize parallel DDL to speed up operations such as COMPRESS.
 * Provides serialization controls to avoid conflicting jobs becoming kamikaze.
-* Provides a common framework for partitioning so that partition joins and partition pruning is optimal across tables and schemas and applications.
+* Provides a common framework for partitioning so that partition-wise joins and partition pruning is optimal across tables and schemas and applications.
 
 Restrictions:
 
