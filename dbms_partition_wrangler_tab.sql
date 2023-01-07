@@ -81,7 +81,7 @@ CREATE TABLE DBMS_PARTITION_WRANGLER_PARMS (
   DESCRIPTION      VARCHAR2(256),
   PERMITTED_VALUES VARCHAR2(512),
   REGEX_STRING     VARCHAR2(128),
-  MANDATORY        CHAR(1),
+  MANDATORY        CHAR(1), --does this mean it is nullable?
   CHANGEABLE       CHAR(1)
 ) TABLESPACE USERS;
 
@@ -497,7 +497,7 @@ INSERT INTO DBMS_PARTITION_WRANGLER_PARMS
 VALUES (
   SEQ_DBMS_PARTITION_WRANGLER_PARMS.NEXTVAL,
   'REDO_LOGGING',
-  'If set, the TDE encryption mode used when creating new tablespaces',
+  'Whether to disable redo log generation during DDL and DML',
   'LOGGING|NOLOGGING',
   'N',
   'Y'
