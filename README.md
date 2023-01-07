@@ -86,6 +86,7 @@ Features:
 * Provide diagnostics by checking the partitioning configuration.
 * Provide recommendations by checking the partitioning configuration. For instance the optimal DBMS_STATS settings.
 * Provide the ability to utilize parallel DDL to speed up operations such as COMPRESS.
+* Provides serialization controls to avoid conflicting jobs becoming kamikaze.
 
 Restrictions:
 
