@@ -26,7 +26,7 @@ CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2,
     p_parameter       IN VARCHAR2,
-    p_value           IN VARCHAR2
+    p_value           IN VARCHAR2 DEFAULT NULL
   );
 
   --returns the specified setting for the table
