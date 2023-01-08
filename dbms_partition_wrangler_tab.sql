@@ -437,8 +437,8 @@ INSERT INTO DBMS_PARTITION_WRANGLER_PARMS
 VALUES (
   SEQ_DBMS_PARTITION_WRANGLER_PARMS.NEXTVAL,
   'TABLESPACE_MINSIZE',
-  'The starting size for BIGFILE tablespaces with the unit (M,G), e.g. 100M or 100G',
-  '[0-9][M|G]$',
+  'The starting size for BIGFILE tablespaces with the unit (M,G,T), e.g. 100M or 100G or 1T',
+  '[0-9][M|G|T]$',
   'Y',
   'Y'
 );
@@ -486,7 +486,7 @@ VALUES (
   SEQ_DBMS_PARTITION_WRANGLER_PARMS.NEXTVAL,
   'TABLESPACE_ENCRYPTION',
   'If set, the TDE encryption mode used when creating new tablespaces',
-  'AES128|AES192|AES256',
+  'AES128|AES192|AES256|GOST256|SEED128|3DES168',
   'N',
   'Y'
 );
