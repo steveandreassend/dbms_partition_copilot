@@ -289,7 +289,9 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
   ) IS
 
   BEGIN
-   --set lock
+    --set lock
+    set_lock
+
     --check if table already registered
     IF is_managed_table(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
       raise_application_error(-20000,'Table is already registered');
@@ -301,11 +303,13 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     END IF;
 
     --add entry for table
-    INSERT INTO dbms_partition_wrangler_settings (
+    INSERT INTO DBMS_PARTITION_WRANGLER_TABS (
+      ID,
       table_owner,
       table_name
     )
     VALUES (
+      SEQ_DBMS_PARTITION_WRANGLER.NEXTVAL,
       UPPER(p_table_owner),
       UPPER(p_table_name)
     );
@@ -328,6 +332,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
    );
 
     --remove lock
+    release_lock();
 
   END register_table;
 
@@ -365,6 +370,35 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END unregister_table;
 
+  --get the ID of a parameter
+  FUNCTION get_parameter_id(
+    p_parameter IN VARCHAR2
+  ) RETURN INTEGER IS
+    l_val dbms_partition_wrangler_parms.ID%TYPE;
+  BEGIN
+    SELECT ID INTO l_val
+    FROM dbms_partition_wrangler_parms
+    WHERE PARAMETER_NAME = UPPER(p_parameter);
+
+    RETURN l_val;
+
+  END get_parameter_id;
+
+  --get the ID of a table
+  FUNCTION get_table_id(
+    p_table_owner IN VARCHAR2,
+    p_table_name IN VARCHAR2
+  ) RETURN INTEGER IS
+    l_val dbms_partition_wrangler_tabs.ID%TYPE;
+  BEGIN
+    SELECT ID INTO l_val
+    FROM dbms_partition_wrangler_tabs
+    WHERE table_owner = UPPER(p_table_owner)
+    AND table_name = UPPER(p_table_name);
+
+    RETURN l_val;
+
+  END get_table_id;
 
   --set parameters for a registered table
   --should pass in a PLSQL table of 2 parameters instead
@@ -374,6 +408,8 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_parameter       IN VARCHAR2,
     p_value           IN VARCHAR2 DEFAULT NULL
   ) IS
+    l_table_id dbms_partition_wrangler_tabs.ID%TYPE;
+    l_parameter_id dbms_partition_wrangler_parms.ID%TYPE;
   BEGIN
     --checks
     IF NOT is_valid_string(p_string => p_table_owner) THEN
@@ -412,6 +448,8 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     l_parameter_id := get_parameter_id(p_parameter);
     l_table_id := get_table_id(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
+    --add the parameter or update it if it exists
+    --UPSERT
     MERGE INTO dbms_partition_wrangler_settings
     USING source_table
       ON search_condition
@@ -580,23 +618,333 @@ FUNCTION get_version RETURN VARCHAR2;
 --is_table_owner?
 --invokers rights so that you only modify your table?
 
---PRIVATE: procedure to set a managed tablespace to read-only mode
-PROCEDURE set_readonly(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2,
-  p_tablespace_name IN VARCHAR2
-) IS
-BEGIN
-END set_readonly;
+  --check if TS RO
+  FUNCTION is_readonly(
+    p_tablespace_name IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+  BEGIN
+    SELECT COUNT(1) INTO l_count
+    FROM dba_tablespaces
+    WHERE tablespace_name = UPPER(p_tablespace_name)
+    AND STATUS = 'READ ONLY';
 
---PRIVATE: procedure to set a managed tablespace to read-write mode
-PROCEDURE set_readwrite(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2,
-  p_tablespace_name IN VARCHAR2
-) IS
-BEGIN
-END set_readwrite;
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+  END is_readonly;
+
+  --check if tablespace exists
+  FUNCTION is_tablespace(
+    p_tablespace_name IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+  BEGIN
+    SELECT COUNT(1) INTO l_count
+    FROM dba_tablespaces
+    WHERE tablespace_name = UPPER(p_tablespace_name);
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+  END is_tablespace;
+
+  --check if TS is covered as part of the package
+  FUNCTION is_managed_tablespace(
+    p_tablespace_name IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+  BEGIN
+    SELECT COUNT(1) INTO l_count
+    FROM dba_tablespaces
+    WHERE tablespace_name = UPPER(p_tablespace_name)
+    AND tablespace_name IN (
+      SELECT tablespace_name
+      FROM dba_extents
+      WHERE (owner,segment_name) IN (
+        SELECT table_owner, table_name
+        FROM dbms_partition_wrangler_tabs
+      )
+    ) OR (
+      SELECT tablespace_name
+      FROM dba_tab_partitions
+      WHERE (table_owner,table_name) IN (
+        SELECT table_owner, table_name
+        FROM dbms_partition_wrangler_tabs
+      )
+    ) OR (
+      SELECT tablespace_name
+      FROM DBA_TAB_SUBPARTITIONS
+      WHERE (table_owner,table_name) IN (
+        SELECT table_owner, table_name
+        FROM dbms_partition_wrangler_tabs
+      )
+    );
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+
+  END is_managed_tablespace;
+
+  --PRIVATE: procedure to set a managed tablespace to read-only mode
+  PROCEDURE set_readonly(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) IS
+  BEGIN
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+
+    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    END IF;
+
+    IF is_readonly(p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespaces already READ-ONLY: '||p_tablespace_name);
+    END IF;
+
+    --apply
+    EXECUTE IMMEDIATE 'ALTER TABLESPACE '||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_tablespace_name)||' READ ONLY';
+
+    --log
+    log_event(
+      p_username   => USER,
+      p_action     => 'SET_READONLY',
+      p_message    => p_tablespace_name
+    );
+
+  END set_readonly;
+
+  --PRIVATE: procedure to set a managed tablespace to read-write mode
+  PROCEDURE set_readwrite(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) IS
+  BEGIN
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+
+    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    END IF;
+
+    IF NOT is_readonly(p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespaces already READ-WRITE: '||p_tablespace_name);
+    END IF;
+
+    --apply
+    EXECUTE IMMEDIATE 'ALTER TABLESPACE '||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_tablespace_name)||' READ WRITE';
+
+    --log
+    log_event(
+      p_username   => USER,
+      p_action     => 'SET_READWRITE',
+      p_message    => p_tablespace_name
+    );
+
+  END set_readwrite;
+
+  --PRIVATE: procedure to set a managed tablespace to read-write mode
+  PROCEDURE drop_tablespace(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) IS
+  BEGIN
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+
+    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    END IF;
+
+    --apply
+    EXECUTE IMMEDIATE 'DROP TABLESPACE '||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_tablespace_name)||' INCLUDING CONTENTS AND DATAFILES';
+
+    --log
+    log_event(
+      p_username   => USER,
+      p_action     => 'DROP_TABLESPACE',
+      p_message    => p_tablespace_name
+    );
+
+  END drop_tablespace;
+
+  PROCEDURE shrink_tablespace(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) IS
+    l_db_block_size INTEGER;
+    l_file_id INTEGER;
+    l_hwm INTEGER;
+    l_size VARCHAR2(256);
+  BEGIN
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+
+    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    END IF;
+
+    --get actual DB_BLOCK_SIZE even if specified
+    SELECT block_size INTO l_db_block_size
+    FROM dba_tablespaces
+    WHERE tablespace_name = UPPER(p_tablespace_name);
+
+    --get file_id
+    SELECT file_id
+    FROM dba_data_files
+    WHERE tablespace_name = UPPER(p_tablespace_name);
+
+    --find highest block ID of any extents in tablespace
+    BEGIN
+      SELECT MAX(block_id+blocks-1) INTO l_hwm
+      FROM dba_extents
+      WHERE file_id IN (
+        SELECT file_id
+        FROM dba_data_files
+        WHERE tablespace_name = UPPER(p_tablespace_name)
+      );
+
+      l_size := l_hwm * l_db_block_size;
+
+    EXCEPTIONS
+      --handle where tablespace is empty by failing to get l_hwm
+      WHEN OTHERS THEN
+        l_size := NVL(get_parameter(
+          p_table_owner   => p_table_owner,
+          p_table_name    => p_table_name,
+          p_parameter     => 'TABLESPACE_MINSIZE'
+        ),1*l_db_block_size);
+    END;
+
+    --apply
+    EXECUTE IMMEDIATE 'ALTER DATABASE DATAFILE '||l_file_id||' RESIZE '||l_size;
+
+    --log
+    log_event(
+      p_username   => USER,
+      p_action     => 'SHRINK_TABLESPACE',
+      p_message    => p_tablespace_name
+    );
+
+  END shrink_tablespace;
+
+  --offline encryption of tablespace
+  PROCEDURE encrypt_tablespace(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) IS
+    l_val dbms_partition_wrangler_settings.SETTING%TYPE;
+  BEGIN
+    --checks
+    IF NOT is_valid_string(p_string => p_table_owner) THEN
+      raise_application_error(-20000,'Invalid value for p_table_owner');
+    END IF;
+    IF NOT is_valid_string(p_string => p_table_name) THEN
+      raise_application_error(-20000,'Invalid value for p_table_name');
+    END IF;
+
+    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Invalid value for p_tablespace_name');
+    END IF;
+
+    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    END IF;
+
+    -- get encryption mode
+    l_val := get_parameter(
+      p_table_owner   => p_table_owner,
+      p_table_name    => p_table_name,
+      p_parameter     => 'TABLESPACE_ENCRYPTION'
+    );
+
+    --could/should force AES256
+    IF l_val IS NULL THEN
+      raise_application_error(-20000,'Unable to retrieve encryption mode');
+    END IF;
+
+    --apply
+    EXECUTE IMMEDIATE 'ALTER TABLESPACE '||p_tablespace_name||' OFFLINE NORMAL';
+    EXECUTE IMMEDIATE 'ALTER TABLESPACE '||p_tablespace_name||' ENCRYPTION OFFLINE USING '''||l_val||''' ENCRYPT';
+    EXECUTE IMMEDIATE 'ALTER TABLESPACE '||p_tablespace_name||' ONLINE';
+
+    --log
+    log_event(
+      p_username   => USER,
+      p_action     => 'ENCRYPT_TABLESPACE',
+      p_message    => p_tablespace_name
+    );
+
+  END encrypt_tablespace;
 
 /*
 PRIVATE PROCEDURES:
@@ -605,9 +953,9 @@ set_lock
 release_lock
 audit_access
 create_tablespace
-encrypt_tablespace
 drop_tablespace
 shrink_tablespace
+encrypt_tablespace
 truncate_partition
 drop_partition
 create_partition
@@ -647,7 +995,7 @@ get_tablespace_asm_diskgroup
 get_active_tablespace
 get_inactive_tablespace
 is_asm_diskgroup_tablespace
-is_partition_locked
+is_partition_locked -- this needed?
 
 */
 /* Moving data files online with ALTER DATABASE MOVE DATAFILE */
