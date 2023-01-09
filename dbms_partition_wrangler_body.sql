@@ -88,6 +88,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
       END IF;
 
       RETURN TRUE;
+
     ELSIF p_object_type = 'TABLE' THEN
       IF NOT is_valid_string(p_string => p_table_owner) THEN
         raise_application_error(-20000,'Invalid value for p_table_owner');
@@ -97,7 +98,13 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
         raise_application_error(-20000,'Invalid value for p_table_name');
       END IF;
 
+      --check if table exists and is range partitioned
+      IF NOT is_range_partitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+        raise_application_error(-20000,'Table must be range partitioned');
+      END IF;
+
       RETURN TRUE;
+
     END IF;
 
     RETURN FALSE;
@@ -210,6 +217,16 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     l_lock_status NUMBER;
     l_lock_name   VARCHAR2(256);
   BEGIN
+    --check
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
     --proceed if unlocked
     --LBYL approach
     IF is_locked(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
@@ -243,6 +260,16 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     l_lock_status NUMBER;
     l_lock_name   VARCHAR2(256);
   BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
     --only proceed if locked
     IF NOT is_locked(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
       raise_application_error(-20000,'Table is not locked by dbms_partition_wrangler');
@@ -325,26 +352,32 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END is_registered_table;
 
---add a table to be managed
---schedules jobs for this table
+  --add a table to be managed
+  --schedules jobs for this table
   PROCEDURE register_table(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
   ) IS
 
   BEGIN
-    --set lock
-    set_lock
+
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
 
     --check if table already registered
     IF is_managed_table(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
       raise_application_error(-20000,'Table is already registered');
     END IF;
 
-    --check if table exists and is range partitioned
-    IF NOT is_range_partitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
-      raise_application_error(-20000,'Table must be range partitoned');
-    END IF;
+    --set lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     --add entry for table
     INSERT INTO DBMS_PARTITION_WRANGLER_TABS (
@@ -376,7 +409,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
    );
 
     --remove lock
-    release_lock();
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
   END register_table;
 
@@ -387,14 +420,18 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_table_name      IN VARCHAR2
   ) IS
   BEGIN
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
     --check if table already registered
     IF NOT is_managed_table(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
       raise_application_error(-20000,'Table is not registered');
-    END IF;
-
-    --check if table exists and is range partitioned
-    IF NOT is_range_partitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
-      raise_application_error(-20000,'Table must be range partitoned');
     END IF;
 
     --remove all jobs
@@ -521,11 +558,19 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_table_name      IN VARCHAR2
   ) IS
   BEGIN
-    --sets lock
-    set_lock();
 
     --checks
-    is_valid_string();
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    --sets lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     --sets managed flag
     modify_table(
@@ -547,7 +592,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     log_event();
 
     --release_lock
-    release_lock();
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
   END set_managed_table;
 
