@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   -- protect against SQL injection
@@ -58,6 +57,51 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     END IF;
 
   END is_parameter;
+
+  --common function to validate input parameters for a given table
+  --avoid duplicating this functionality in each procedure
+  FUNCTION check_object_parameters(
+    p_table_owner       IN VARCHAR2,
+    p_table_name        IN VARCHAR2,
+    p_object_type       IN VARCHAR2
+  ) RETURN BOOLEAN IS
+  BEGIN
+    IF p_object_type = 'TABLESPACE' THEN
+      IF NOT is_valid_string(p_string => p_table_owner) THEN
+        raise_application_error(-20000,'Invalid value for p_table_owner');
+      END IF;
+
+      IF NOT is_valid_string(p_string => p_table_name) THEN
+        raise_application_error(-20000,'Invalid value for p_table_name');
+      END IF;
+
+      IF NOT is_valid_string(p_string => p_tablespace_name) THEN
+        raise_application_error(-20000,'Invalid value for p_tablespace_name');
+      END IF;
+
+      IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
+        raise_application_error(-20000,'Invalid value for p_tablespace_name');
+      END IF;
+
+      IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
+        raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+      END IF;
+
+      RETURN TRUE;
+    ELSIF p_object_type = 'TABLE' THEN
+      IF NOT is_valid_string(p_string => p_table_owner) THEN
+        raise_application_error(-20000,'Invalid value for p_table_owner');
+      END IF;
+
+      IF NOT is_valid_string(p_string => p_table_name) THEN
+        raise_application_error(-20000,'Invalid value for p_table_name');
+      END IF;
+
+      RETURN TRUE;
+    END IF;
+
+    RETURN FALSE;
+  END check_object_parameters;
 
   --returns the specified setting for the table
   FUNCTION get_parameter(
@@ -613,10 +657,14 @@ FUNCTION count_all_partitions(
   p_table_name      IN VARCHAR2
 ) RETURN INTEGER;
 
---returns the build version of DBMS_PARTITION_WRANGLER
-FUNCTION get_version RETURN VARCHAR2;
 --is_table_owner?
 --invokers rights so that you only modify your table?
+
+  --returns the build version of DBMS_PARTITION_WRANGLER
+  FUNCTION get_version RETURN VARCHAR2 IS
+  BEGIN
+    RETURN g_version;
+  END get_version;
 
   --check if TS RO
   FUNCTION is_readonly(
@@ -701,23 +749,13 @@ FUNCTION get_version RETURN VARCHAR2;
   ) IS
   BEGIN
     --checks
-    IF NOT is_valid_string(p_string => p_table_owner) THEN
-      raise_application_error(-20000,'Invalid value for p_table_owner');
-    END IF;
-    IF NOT is_valid_string(p_string => p_table_name) THEN
-      raise_application_error(-20000,'Invalid value for p_table_name');
-    END IF;
-
-    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
     END IF;
 
     IF is_readonly(p_tablespace_name) THEN
@@ -744,23 +782,13 @@ FUNCTION get_version RETURN VARCHAR2;
   ) IS
   BEGIN
     --checks
-    IF NOT is_valid_string(p_string => p_table_owner) THEN
-      raise_application_error(-20000,'Invalid value for p_table_owner');
-    END IF;
-    IF NOT is_valid_string(p_string => p_table_name) THEN
-      raise_application_error(-20000,'Invalid value for p_table_name');
-    END IF;
-
-    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
     END IF;
 
     IF NOT is_readonly(p_tablespace_name) THEN
@@ -787,23 +815,13 @@ FUNCTION get_version RETURN VARCHAR2;
   ) IS
   BEGIN
     --checks
-    IF NOT is_valid_string(p_string => p_table_owner) THEN
-      raise_application_error(-20000,'Invalid value for p_table_owner');
-    END IF;
-    IF NOT is_valid_string(p_string => p_table_name) THEN
-      raise_application_error(-20000,'Invalid value for p_table_name');
-    END IF;
-
-    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
     END IF;
 
     --apply
@@ -829,23 +847,13 @@ FUNCTION get_version RETURN VARCHAR2;
     l_size VARCHAR2(256);
   BEGIN
     --checks
-    IF NOT is_valid_string(p_string => p_table_owner) THEN
-      raise_application_error(-20000,'Invalid value for p_table_owner');
-    END IF;
-    IF NOT is_valid_string(p_string => p_table_name) THEN
-      raise_application_error(-20000,'Invalid value for p_table_name');
-    END IF;
-
-    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
     END IF;
 
     --get actual DB_BLOCK_SIZE even if specified
@@ -901,23 +909,13 @@ FUNCTION get_version RETURN VARCHAR2;
     l_val dbms_partition_wrangler_settings.SETTING%TYPE;
   BEGIN
     --checks
-    IF NOT is_valid_string(p_string => p_table_owner) THEN
-      raise_application_error(-20000,'Invalid value for p_table_owner');
-    END IF;
-    IF NOT is_valid_string(p_string => p_table_name) THEN
-      raise_application_error(-20000,'Invalid value for p_table_name');
-    END IF;
-
-    IF NOT is_valid_string(p_string => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Invalid value for p_tablespace_name');
-    END IF;
-
-    IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-      raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
     END IF;
 
     -- get encryption mode
