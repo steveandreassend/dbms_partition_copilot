@@ -1,5 +1,7 @@
 CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
 
+  g_version VARCHAR2(10) := '1.0';
+
   --add a table to be managed
   --schedules jobs for this table
   PROCEDURE register_table(
