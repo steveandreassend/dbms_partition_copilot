@@ -597,7 +597,10 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
     --sets managed flag
     modify_table(
-
+      p_table_owner     => UPPER(p_table_owner),
+      p_table_name      => UPPER(p_table_name),
+      p_parameter       => 'MANAGED',
+      p_value           => 'Y'
     );
 
     --in case of a malfunction, remove all jobs in case they exist to avoid duplication
@@ -623,15 +626,57 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END set_managed_table;
 
-/*
-Places table in unmanaged state:
-1. Sets unmanaged flag
-2. Removes scheduled jobs for table using remove_all_jobs()
-*/
-PROCEDURE set_unmanaged_table(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2
-);
+  /*
+  Places table in unmanaged state:
+  1. Sets unmanaged flag
+  2. Removes scheduled jobs for table using remove_all_jobs()
+  */
+  PROCEDURE set_unmanaged_table(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) IS
+  BEGIN
+
+  --checks
+  IF NOT check_object_parameters(
+    p_table_owner       => UPPER(p_table_owner),
+    p_table_name        => UPPER(p_table_name),
+    p_object_type       => 'TABLE')
+  ) THEN
+    --this will never trigger because the function will trigger first it validation fails
+    raise_application_error(-20000,'Invalid parameters');
+  END IF;
+
+  --sets lock
+  set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+  --sets managed flag
+  modify_table(
+    p_table_owner     => UPPER(p_table_owner),
+    p_table_name      => UPPER(p_table_name),
+    p_parameter       => 'MANAGED',
+    p_value           => 'N'
+  );
+
+  --in case of a malfunction, remove all jobs in case they exist to avoid duplication
+  --EAFP approach - it's easier to ask forgiveness than permission
+  BEGIN
+    remove_all_jobs(p_table_owner => p_table_owner, p_table_name => p_table_name);
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+
+  --release_lock
+  release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+  --log action
+  log_event(
+    p_username   => USER,
+    p_action     => 'SET_UNMANAGED_TABLE',
+    p_message    => UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+  );
+
+END set_unmanaged_table;
 
 /*
 Top-level procedure to run the add pre-allocated partitions and drop inactive partitions:
