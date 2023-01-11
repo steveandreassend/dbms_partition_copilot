@@ -637,68 +637,113 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
   ) IS
   BEGIN
 
-  --checks
-  IF NOT check_object_parameters(
-    p_table_owner       => UPPER(p_table_owner),
-    p_table_name        => UPPER(p_table_name),
-    p_object_type       => 'TABLE')
-  ) THEN
-    --this will never trigger because the function will trigger first it validation fails
-    raise_application_error(-20000,'Invalid parameters');
-  END IF;
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
 
-  --sets lock
-  set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+    --sets lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
-  --sets managed flag
-  modify_table(
-    p_table_owner     => UPPER(p_table_owner),
-    p_table_name      => UPPER(p_table_name),
-    p_parameter       => 'MANAGED',
-    p_value           => 'N'
-  );
+    --sets managed flag
+    modify_table(
+      p_table_owner     => UPPER(p_table_owner),
+      p_table_name      => UPPER(p_table_name),
+      p_parameter       => 'MANAGED',
+      p_value           => 'N'
+    );
 
-  --in case of a malfunction, remove all jobs in case they exist to avoid duplication
-  --EAFP approach - it's easier to ask forgiveness than permission
+    --in case of a malfunction, remove all jobs in case they exist to avoid duplication
+    --EAFP approach - it's easier to ask forgiveness than permission
+    BEGIN
+      remove_all_jobs(p_table_owner => p_table_owner, p_table_name => p_table_name);
+    EXCEPTION
+      WHEN OTHERS THEN NULL;
+    END;
+
+    --release_lock
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    --log action
+    log_event(
+      p_username   => USER,
+      p_action     => 'SET_UNMANAGED_TABLE',
+      p_message    => UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+  END set_unmanaged_table;
+
+  /*
+  Top-level procedure to run the add pre-allocated partitions and drop inactive partitions:
+  1. Calls add_partition() if necessary
+  2. Calls drop_partition() if necessary
+  */
+  PROCEDURE process_partitions(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) IS
   BEGIN
-    remove_all_jobs(p_table_owner => p_table_owner, p_table_name => p_table_name);
-  EXCEPTION
-    WHEN OTHERS THEN NULL;
-  END;
+    --determine if partitions need to be pre-allocated
 
-  --release_lock
-  release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+    --determine if partitions need to be dropped
+  END process_partitions;
 
-  --log action
-  log_event(
-    p_username   => USER,
-    p_action     => 'SET_UNMANAGED_TABLE',
-    p_message    => UPPER(p_table_owner)||'.'||UPPER(p_table_name)
-  );
+  --Add pre-allocated partition, with associated tablespace if required
+  PROCEDURE add_partition(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) IS
+  BEGIN
+  END add_partition;
 
-END set_unmanaged_table;
+  --Drop inactive historical partitions, with associated tablespaces if required
+  PROCEDURE drop_partition(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_partition_name  IN VARCHAR2
+  ) IS
+    l_restore_point INTEGER;
+  BEGIN
+    --checks
+    PARTITION
 
-/*
-Top-level procedure to run the add pre-allocated partitions and drop inactive partitions:
-1. Calls add_partition()
-2. Calls drop_partitions()
-*/
-PROCEDURE process_partitions(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2
-);
+    is_partition
 
---Add pre-allocated partition, with associated tablespace if required
-PROCEDURE add_partition(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2
-);
+    IF NOT is_expired_partition() THEN
+      raise_application_error();
+    END IF;
 
---Drop inactive historical partitions, with associated tablespaces if required
-PROCEDURE drop_partitions(
-  p_table_owner     IN VARCHAR2,
-  p_table_name      IN VARCHAR2
-);
+    --
+    l_restore_point := get_parameter();
+    IF l_restore_point = 'Y' THEN
+      --create GRP
+      create_grp();
+    END IF;
+
+    EXECUTE IMMEDIATE 'ALTER TABLE '||p_table_owner||'.'||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_table_name)||' DROP PARTITION '||p_partition_name;
+
+    --Handle
+    IF l_restore_point = 'Y' THEN
+      --shrink the tablespace size to the current HWM to free up disk space
+      --because the tablespace is dropped at a later date
+      shrink_tablespace();
+
+      --Create a job to drop the restore point according to the request
+      submit_job();
+
+      --Suspend tablespace dropping by submitting a post-dated job +24 hours after the GRP is dropped
+      --Flashback Database requires that the tablespace exist if the GRP is to be used to recovery the dropped partition
+      submit_job();
+    ELSE
+      --direct drop of tablespace if no GRP is used
+      drop_tablespace();
+    END IF;
+  END drop_partition;
 
 --report the configuration for the table using dbms_output
 PROCEDURE report_table(
@@ -869,6 +914,7 @@ FUNCTION count_all_partitions(
     IF NOT check_object_parameters(
       p_table_owner       => UPPER(p_table_owner),
       p_table_name        => UPPER(p_table_name),
+      p_tablespace_name   => UPPER(p_tablespace_name),
       p_object_type       => 'TABLESPACE')
     ) THEN
       --this will never trigger because the function will trigger first it validation fails
@@ -890,6 +936,36 @@ FUNCTION count_all_partitions(
     );
 
   END set_readonly;
+
+  --check if tablespace is empty
+  FUNCTION is_tablespace_empty(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_tablespace_name IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count NUMBER;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_tablespace_name   => UPPER(p_tablespace_name)
+      p_object_type       => 'TABLESPACE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    SELECT SUM(bytes) INTO l_count
+    FROM dba_extents
+    WHERE tablespace_name = UPPER(p_tablespace_name);
+
+    IF l_count > 0 THEN
+      RETURN FALSE;
+    ELSE
+      RETURN TRUE;
+    END IF;
+  END is_tablespace_empty;
 
   --PRIVATE: procedure to set a managed tablespace to read-write mode
   PROCEDURE set_readwrite(
@@ -941,8 +1017,12 @@ FUNCTION count_all_partitions(
       raise_application_error(-20000,'Invalid parameters');
     END IF;
 
-    --apply
-    EXECUTE IMMEDIATE 'DROP TABLESPACE '||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_tablespace_name)||' INCLUDING CONTENTS AND DATAFILES';
+    IF NOT is_tablespace_empty(p_tablespace_name) THEN
+      raise_application_error(-20000,'Tablespace is not empty');
+    END IF;
+
+    --do not force drop contents in case of a rolled up tablespace
+    EXECUTE IMMEDIATE 'DROP TABLESPACE '||sys.DBMS_ASSERT.SQL_OBJECT_NAME(p_tablespace_name)||' INCLUDING DATAFILES';
 
     --log
     log_event(
