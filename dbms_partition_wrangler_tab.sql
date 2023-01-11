@@ -503,6 +503,41 @@ VALUES (
 );
 COMMIT;
 
+/*
+GRP capability to allow you to undo the partition drop.
+
+If CREATE_GRP=Y, it will drop the partition, but the dedicated tablespace will be dropped only once the GRP has been removed.
+
+If using PDBs you’ve got this problem that you must allow drop tablespace with GRPs by setting a parameter:
+CDB$ROOT: alter system set "_allow_drop_ts_with_grp"=true;
+Setting that parameter will mean that a dropped tablespace will invalidate any GRPs and your ability to recover.
+ref: https://mikedietrichde.com/2018/06/05/drop-a-tablespace-in-a-pdb-with-a-guaranteed-restore-point-being-active/
+*/
+
+INSERT INTO DBMS_PARTITION_WRANGLER_PARMS
+(ID, PARAMETER_NAME,DESCRIPTION,REGEX_STRING)
+VALUES (
+  SEQ_DBMS_PARTITION_WRANGLER_PARMS.NEXTVAL,
+  'CREATE_GRP',
+  'Whether to create a temporary Guaranteed Restore Point prior to dropping a partition',
+  'Y|N',
+  'N',
+  'Y'
+);
+COMMIT;
+
+INSERT INTO DBMS_PARTITION_WRANGLER_PARMS
+(ID, PARAMETER_NAME,DESCRIPTION,REGEX_STRING)
+VALUES (
+  SEQ_DBMS_PARTITION_WRANGLER_PARMS.NEXTVAL,
+  'GRP_DURATION_MINS',
+  'Number of minutes after dropping the partition to drop the Guaranteed Restore Point',
+  '[0-9]',
+  'N',
+  'Y'
+);
+COMMIT;
+
 CREATE TABLE DBMS_PARTITION_WRANGLER_SETTINGS (
   ID INTEGER PRIMARY KEY,
   PARAMETER_ID INTEGER NOT NULL,
