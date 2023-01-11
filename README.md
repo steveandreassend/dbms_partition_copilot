@@ -88,6 +88,8 @@ Features:
 * Provide the ability to utilize parallel DDL to speed up operations such as COMPRESS.
 * Provides serialization controls to avoid conflicting jobs becoming kamikaze.
 * Provides a common framework for partitioning so that partition-wise joins and partition pruning is optimal across tables and schemas and applications.
+* Provides an optional integration with Flashback Database to allow emergency rollbacks using Guaranteed Restore Points when dropping partitions.
+* Provides control of feature usage to ensure compliance with your Oracle licenses.
 
 Restrictions:
 
