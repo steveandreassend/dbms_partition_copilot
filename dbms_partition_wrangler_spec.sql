@@ -60,9 +60,7 @@ CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
   );
 
   /*
-  Top-level procedure to run the add pre-allocated partitions and drop inactive partitions:
-  1. Calls add_partition()
-  2. Calls drop_partitions()
+  Top-level procedure to add, compress, move, readonly, truncate, shrink, drop partititions and tablespaces
   */
   PROCEDURE process_partitions(
     p_table_owner     IN VARCHAR2,
