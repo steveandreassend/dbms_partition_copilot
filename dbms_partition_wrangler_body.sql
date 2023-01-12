@@ -679,7 +679,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
   END set_unmanaged_table;
 
   --whether all specified partitions have been allocated?
-  FUNCTION is_preallocated()
+  FUNCTION is_preallocated(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
   ) RETURN BOOLEAN IS
@@ -726,14 +726,14 @@ SELECT warehouse_name warehouse,
       partition_name,
       extractvalue(dbms_xmlgen.getxmltype('SELECT high_value
         FROM DBA_TAB_PARTITIONS
-        WHERE owner = ''' || UPPER(p_table_name) ||
-        ''' AND table_name = ''' || UPPER(p_table_owner) ||
+        WHERE owner = ''' || UPPER(p_table_owner) ||
+        ''' AND table_name = ''' || UPPER(p_table_name) ||
         ''' AND PARTITION_NAME = ''' || t.PARTITION_NAME || ''''),
         '//text()'
       ) AS high_value
     FROM dba_tab_partitions t
-    WHERE owner = UPPER(p_table_name)
-    AND table_name = UPPER(p_table_owner)
+    WHERE owner = UPPER(p_table_owner)
+    AND table_name = UPPER(p_table_name)
     ), final_result (
       SELECT partition_name,
              TO_DATE(substr(high_value,11,10),'YYYY-DD-MM') high_value
@@ -750,6 +750,35 @@ SELECT warehouse_name warehouse,
     END IF;
 
   END is_preallocated;
+
+  FUNCTION is_subpartitioned(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    SELECT COUNT(1) INTO l_count
+    FROM DBA_PART_TABLES
+    WHERE SUBPARTITIONING_TYPE != 'NONE'
+    AND owner = UPPER(p_table_owner)
+    AND table_name = UPPER(p_table_name);
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+  END is_subpartitioned;
 
   /*
   Top-level procedure to add, compress, move, readonly, truncate, shrink, drop partititions and tablespaces
@@ -780,11 +809,132 @@ SELECT warehouse_name warehouse,
     set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     --determine if new partitions need to be pre-allocated based upon the configured parameter
-    WHILE NOT is_preallocated() LOOP
-      add_partition(p_table_owner => p_table_owner, p_table_name => p_table_name)
+    WHILE NOT is_preallocated(p_table_owner => p_table_owner, p_table_name => p_table_name) LOOP
+      add_partition(p_table_owner => p_table_owner, p_table_name => p_table_name);
     END LOOP;
 
     --determine if inactive partitions need to be moved to a different buffer pool
+    l_inactive_tab_partition_bpool := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'TAB_INACTIVE_BUFFER_POOL'
+    );
+
+    l_inactive_ind_partition_bpool := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'IND_INACTIVE_BUFFER_POOL'
+    );
+
+    --process table partitions
+    IF l_inactive_tab_partition_bpool IS NOT NULL THEN
+      IF is_subpartitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+        --process table subpartitions
+        FOR x IN (
+          SELECT owner, table_name, subpartition_name, BUFFER_POOL
+          FROM dba_tab_subpartitions
+          WHERE partition_name IN (
+            SELECT partition_name
+            FROM dba_partitions
+            WHERE table_owner = UPPER(p_table_owner)
+            AND table_name    = UPPER(p_table_name)
+          )
+          AND BUFFER_POOL != l_inactive_tab_partition_bpool
+        )
+        LOOP
+
+          IF is_expired_partition(
+            p_table_owner => UPPER(p_table_owner),
+            p_table_name => UPPER(p_table_name),
+            p_partition_name => UPPER(p_partition_name)
+          ) THEN
+            --check syntax
+            EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+              ' MODIFY SUBPARTITION '||x.subpartition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+          END IF;
+
+        END LOOP;
+
+      ELSE
+        --process partitions
+        FOR x IN (
+          SELECT partition_name
+          FROM dba_partitions
+          WHERE table_owner = UPPER(p_table_owner)
+          AND table_name    = UPPER(p_table_name)
+          AND BUFFER_POOL != l_inactive_tab_partition_bpool
+        )
+        LOOP
+
+          IF is_expired_partition(
+            p_table_owner => UPPER(p_table_owner),
+            p_table_name => UPPER(p_table_name),
+            p_partition_name => UPPER(p_partition_name)
+          ) THEN
+            --check syntax
+            EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+              ' MODIFY PARTITION '||x.partition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+          END IF;
+
+        END LOOP;
+
+      END IF;
+    END IF;
+
+    --process index partitions
+    IF l_inactive_ind_partition_bpool IS NOT NULL THEN
+      IF is_subpartitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+        --process table subpartitions
+        FOR x IN (
+          SELECT owner, table_name, subpartition_name, BUFFER_POOL
+          FROM dba_ind_subpartitions
+          WHERE partition_name IN (
+            SELECT partition_name
+            FROM dba_partitions
+            WHERE table_owner = UPPER(p_table_owner)
+            AND table_name    = UPPER(p_table_name)
+          )
+          AND BUFFER_POOL != l_inactive_ind_partition_bpool
+        )
+        LOOP
+
+          IF is_expired_partition(
+            p_table_owner => UPPER(p_table_owner),
+            p_table_name => UPPER(p_table_name),
+            p_partition_name => UPPER(p_partition_name)
+          ) THEN
+            --check syntax
+            EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+              ' MODIFY SUBPARTITION '||x.subpartition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+          END IF;
+
+        END LOOP;
+
+      ELSE
+        --process partitions
+        FOR x IN (
+          SELECT partition_name
+          FROM dba_partitions
+          WHERE table_owner = UPPER(p_table_owner)
+          AND table_name    = UPPER(p_table_name)
+          AND BUFFER_POOL != l_inactive_ind_partition_bpool
+        )
+        LOOP
+
+          IF is_expired_partition(
+            p_table_owner => UPPER(p_table_owner),
+            p_table_name => UPPER(p_table_name),
+            p_partition_name => UPPER(p_partition_name)
+          ) THEN
+            --check syntax
+            EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+              ' MODIFY PARTITION '||x.partition_name||' (BUFFER POOL '||l_inactive_ind_partition_bpool||')';
+          END IF;
+
+        END LOOP;
+
+      END IF;
+    END IF;
 
     /* bulk compress partitions once they are [mostly] inactive, and shrink the tablespace storage */
     --determine if inactive partitions need to be compressed
@@ -1203,8 +1353,8 @@ FUNCTION count_all_partitions(
       --handle where tablespace is empty by failing to get l_hwm
       WHEN OTHERS THEN
         l_size := NVL(get_parameter(
-          p_table_owner   => p_table_owner,
-          p_table_name    => p_table_name,
+          p_table_owner   => UPPER(p_table_owner),
+          p_table_name    => UPPER(p_table_name),
           p_parameter     => 'TABLESPACE_MINSIZE'
         ),1*l_db_block_size);
     END;
