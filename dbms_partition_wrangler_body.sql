@@ -678,19 +678,143 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END set_unmanaged_table;
 
+  --whether all specified partitions have been allocated?
+  FUNCTION is_preallocated()
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_limit INTEGER;
+    l_partition_count INTEGER;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    l_limit := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'PREALLOCATED_PARTITIONS'
+    );
+
+    IF l_limit IS NULL THEN
+      raise_application_error(-20000,'Unable to get parameter PREALLOCATED_PARTITIONS');
+    END IF;
+
+    --a partition is pre-allocated if the date is higher than SYSDATE
+/*
+      This: https://dba.stackexchange.com/questions/210004/extract-date-from-partition-high-value
+WARNING: extractvalue is deprecated: use XMLTABLE instead:
+
+SELECT warehouse_name warehouse,
+   warehouse2."Water", warehouse2."Rail"
+   FROM warehouses,
+   XMLTABLE('/Warehouse'
+      PASSING warehouses.warehouse_spec
+      COLUMNS
+         "Water" varchar2(6) PATH 'WaterAccess',
+         "Rail" varchar2(6) PATH 'RailAccess')
+      warehouse2;
+*/
+    WITH date_partition AS (
+    SELECT
+      partition_name,
+      extractvalue(dbms_xmlgen.getxmltype('SELECT high_value
+        FROM DBA_TAB_PARTITIONS
+        WHERE owner = ''' || UPPER(p_table_name) ||
+        ''' AND table_name = ''' || UPPER(p_table_owner) ||
+        ''' AND PARTITION_NAME = ''' || t.PARTITION_NAME || ''''),
+        '//text()'
+      ) AS high_value
+    FROM dba_tab_partitions t
+    WHERE owner = UPPER(p_table_name)
+    AND table_name = UPPER(p_table_owner)
+    ), final_result (
+      SELECT partition_name,
+             TO_DATE(substr(high_value,11,10),'YYYY-DD-MM') high_value
+    FROM date_partition
+    )
+    SELECT COUNT(1) INTO l_partition_count
+    FROM final_result
+    WHERE high_value > SYSDATE;
+
+    IF l_count >= l_limit THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+
+  END is_preallocated;
+
   /*
-  Top-level procedure to run the add pre-allocated partitions and drop inactive partitions:
-  1. Calls add_partition() if necessary
-  2. Calls drop_partition() if necessary
+  Top-level procedure to add, compress, move, readonly, truncate, shrink, drop partititions and tablespaces
   */
   PROCEDURE process_partitions(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
   ) IS
   BEGIN
-    --determine if partitions need to be pre-allocated
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
 
-    --determine if partitions need to be dropped
+    --log_event
+    log_event(
+      p_username   => USER,
+      p_action     => 'PROCESS_PARTITIONS',
+      p_message    => 'START '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+    --sets lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    --determine if new partitions need to be pre-allocated based upon the configured parameter
+    WHILE NOT is_preallocated() LOOP
+      add_partition(p_table_owner => p_table_owner, p_table_name => p_table_name)
+    END LOOP;
+
+    --determine if inactive partitions need to be moved to a different buffer pool
+
+    /* bulk compress partitions once they are [mostly] inactive, and shrink the tablespace storage */
+    --determine if inactive partitions need to be compressed
+
+    /* optional feature to move tablespaces to a cheaper slower ASM disk group for archiving
+       if all partitions on it are inactive, particularly in the case of rolled up tablespaces */
+    --determine if inactive tablespace partitions need to be moved to another ASM disk group
+
+    /* this is the base case, set TS to RO mode once it is no longer active for DML
+       this action will prevent ROW MOVEMENT for the partition */
+    --determine if inactive tablespace partitions need to be set to READ-ONLY mode
+
+    /* instead of dropping partitions, this option truncates the partition to leave the structure intact */
+    --determine if inactive partitions need to be truncated because they are expired, and dropped at a later date
+    --determine if inactive tablespace with truncated partitions need to be shrunk?
+
+    /* this is the base case, old partitions older than X are dropped and their tablespace too.
+       rolled-up tablespaces (e.g. 1 quartlerly tablespace, 3 monthly partitions) will not be dropped until empty */
+    --determine if inactive partitions need to be dropped because they are expired
+
+    --release lock
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    --log action
+    log_event(
+      p_username   => USER,
+      p_action     => 'PROCESS_PARTITIONS',
+      p_message    => 'END '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
   END process_partitions;
 
   --Add pre-allocated partition, with associated tablespace if required
