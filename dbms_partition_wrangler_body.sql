@@ -1,3 +1,17 @@
+/*
+In Progress:
+is_expired_partition()
+is_inactive_partition()
+process_partitions()
+compress_inactive_partitions()
+
+Issues:
+-subroutines need to check whether to set/release locks if the calling procedure has already done so
+REGEX for COMPRESS_DELAY_DAYS needs to be permit decimals
+Check syntax for ALTER TABLE PARTITION BUFFER POOL
+Compression parameters need to align with 12c-19c options
+*/
+
 CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   -- protect against SQL injection
@@ -678,6 +692,94 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END set_unmanaged_table;
 
+  --is a given partition replaced by a newer partition corresponding to SYSDATE?
+  FUNCTION is_inactive_partition(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_partition_name  IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'PARTITION')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    SELECT COUNT(1) INTO l_count
+    FROM dba_tab_partitions
+    WHERE ?;
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+
+  END is_inactive_partition;
+
+  --is a given partition older than the specified retention period
+  FUNCTION is_expired_partition(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2,
+    p_partition_name  IN VARCHAR2
+  ) RETURN BOOLEAN IS
+    l_count INTEGER;
+    l_INACTIVE_PARTITIONS INTEGER;
+    l_TABLESPACE_RANGE_TYPE VARCHAR2;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'PARTITION')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    --get input parameters
+    l_INACTIVE_PARTITIONS := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'INACTIVE_PARTITIONS'
+    );
+
+    IF l_INACTIVE_PARTITIONS IS NULL THEN
+      raise_application_error(-20000,'Unable to get parameter INACTIVE_PARTITIONS');
+    END IF;
+
+    /*
+    Defines the time window for the range partitioning for the tablespace:
+    DAILY|WEEKLY|MONTHLY|QUARTERLY
+    */
+    l_TABLESPACE_RANGE_TYPE := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'TABLESPACE_RANGE_TYPE'
+    );
+
+    IF l_TABLESPACE_RANGE_TYPE IS NULL THEN
+      raise_application_error(-20000,'Unable to get parameter TABLESPACE_RANGE_TYPE');
+    END IF;
+
+    --determine if partition is beyond the cut-off date
+    SELECT COUNT(1) INTO l_count
+    FROM dba_tab_partitions
+    WHERE ?;
+
+    IF l_count > 0 THEN
+      RETURN TRUE;
+    ELSE
+      RETURN FALSE;
+    END IF;
+
+  END is_expired_partition;
+
   --whether all specified partitions have been allocated?
   FUNCTION is_preallocated(
     p_table_owner     IN VARCHAR2,
@@ -780,14 +882,14 @@ SELECT warehouse_name warehouse,
     END IF;
   END is_subpartitioned;
 
-  /*
-  Top-level procedure to add, compress, move, readonly, truncate, shrink, drop partititions and tablespaces
-  */
-  PROCEDURE process_partitions(
-    p_table_owner     IN VARCHAR2,
-    p_table_name      IN VARCHAR2
-  ) IS
-  BEGIN
+  --applies the settings for
+  PROCEDURE set_inactive_buffer_pool(
+  p_table_owner     IN VARCHAR2,
+  p_table_name      IN VARCHAR2
+) IS
+  l_inactive_tab_partition_bpool VARCHAR2(64);
+  l_inactive_ind_partition_bpool VARCHAR2(64);
+BEGIN
     --checks
     IF NOT check_object_parameters(
       p_table_owner       => UPPER(p_table_owner),
@@ -801,19 +903,13 @@ SELECT warehouse_name warehouse,
     --log_event
     log_event(
       p_username   => USER,
-      p_action     => 'PROCESS_PARTITIONS',
+      p_action     => 'SET_INACTIVE_BUFFER_POOL',
       p_message    => 'START '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
     );
 
     --sets lock
     set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
-    --determine if new partitions need to be pre-allocated based upon the configured parameter
-    WHILE NOT is_preallocated(p_table_owner => p_table_owner, p_table_name => p_table_name) LOOP
-      add_partition(p_table_owner => p_table_owner, p_table_name => p_table_name);
-    END LOOP;
-
-    --determine if inactive partitions need to be moved to a different buffer pool
     l_inactive_tab_partition_bpool := get_parameter(
       p_table_owner   => UPPER(p_table_owner),
       p_table_name    => UPPER(p_table_name),
@@ -843,7 +939,7 @@ SELECT warehouse_name warehouse,
         )
         LOOP
 
-          IF is_expired_partition(
+          IF is_inactive_partition(
             p_table_owner => UPPER(p_table_owner),
             p_table_name => UPPER(p_table_name),
             p_partition_name => UPPER(p_partition_name)
@@ -866,7 +962,7 @@ SELECT warehouse_name warehouse,
         )
         LOOP
 
-          IF is_expired_partition(
+          IF is_inactive_partition(
             p_table_owner => UPPER(p_table_owner),
             p_table_name => UPPER(p_table_name),
             p_partition_name => UPPER(p_partition_name)
@@ -898,7 +994,7 @@ SELECT warehouse_name warehouse,
         )
         LOOP
 
-          IF is_expired_partition(
+          IF is_inactive_partition(
             p_table_owner => UPPER(p_table_owner),
             p_table_name => UPPER(p_table_name),
             p_partition_name => UPPER(p_partition_name)
@@ -921,7 +1017,7 @@ SELECT warehouse_name warehouse,
         )
         LOOP
 
-          IF is_expired_partition(
+          IF is_inactive_partition(
             p_table_owner => UPPER(p_table_owner),
             p_table_name => UPPER(p_table_name),
             p_partition_name => UPPER(p_partition_name)
@@ -936,8 +1032,234 @@ SELECT warehouse_name warehouse,
       END IF;
     END IF;
 
+    --log_event
+    log_event(
+      p_username   => USER,
+      p_action     => 'SET_INACTIVE_BUFFER_POOL',
+      p_message    => 'END '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+    --release lock
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+  END set_inactive_buffer_pool;
+
+  --determine if inactive partitions need to be compressed
+  PROCEDURE compress_inactive_partitions(
+    p_table_owner => p_table_owner,
+    p_table_name => p_table_name
+  ) IS
+    l_COMPRESS_DELAY_DAYS         NUMBER; --allow fractional days
+    l_COMPRESSION_INACTIVE        VARCHAR2(64);
+    l_DDL_PARALLEL_DEGREE         INTEGER;
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    --log_event
+    log_event(
+      p_username   => USER,
+      p_action     => 'COMPRESS_INACTIVE_PARTITIONS',
+      p_message    => 'START '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+    --sets lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    --After how many days after a partition becomes inactive is it compressed, if configured
+    l_COMPRESS_DELAY_DAYS := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'COMPRESS_DELAY_DAYS'
+    );
+
+    /*
+    Compression options for inactive table partitions:
+    NOCOMPRESS|COMPRESS|COMPRESS FOR DIRECT_LOAD OPERATIONS|COMPRESS FOR ALL OPERATIONS
+    */
+    l_COMPRESSION_INACTIVE := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'COMPRESSION_INACTIVE'
+    );
+
+    --The degree of parallelism for all DDL operations on the partitions
+    l_DDL_PARALLEL_DEGREE := get_parameter(
+      p_table_owner   => UPPER(p_table_owner),
+      p_table_name    => UPPER(p_table_name),
+      p_parameter     => 'DDL_PARALLEL_DEGREE'
+    );
+
+    IF l_COMPRESSION_INACTIVE IS NULL OR l_COMPRESSION_INACTIVE = 'NOCOMPRESS' THEN
+      --nothing to do
+      EXIT;
+    END IF;
+
+    IF is_subpartitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+      --process table subpartitions
+      FOR x IN (
+        SELECT owner, table_name, subpartition_name, COMPRESSION
+        FROM dba_tab_subpartitions
+        WHERE partition_name IN (
+          SELECT partition_name
+          FROM dba_partitions
+          WHERE table_owner = UPPER(p_table_owner)
+          AND table_name    = UPPER(p_table_name)
+        )
+        AND BUFFER_POOL != l_inactive_tab_partition_bpool
+      )
+      LOOP
+
+        IF is_inactive_partition(
+          p_table_owner => UPPER(p_table_owner),
+          p_table_name => UPPER(p_table_name),
+          p_partition_name => UPPER(p_partition_name)
+        ) THEN
+          --check syntax
+          EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+            ' MODIFY SUBPARTITION '||x.subpartition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+        END IF;
+
+      END LOOP;
+
+    ELSE
+      --process partitions
+      FOR x IN (
+        SELECT partition_name
+        FROM dba_partitions
+        WHERE table_owner = UPPER(p_table_owner)
+        AND table_name    = UPPER(p_table_name)
+        AND BUFFER_POOL != l_inactive_tab_partition_bpool
+      )
+      LOOP
+
+        IF is_inactive_partition(
+          p_table_owner => UPPER(p_table_owner),
+          p_table_name => UPPER(p_table_name),
+          p_partition_name => UPPER(p_partition_name)
+        ) THEN
+          --check syntax
+          EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+            ' MODIFY PARTITION '||x.partition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+        END IF;
+
+      END LOOP;
+
+    END IF;
+
+    IF is_subpartitioned(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
+      --process table subpartitions
+      FOR x IN (
+        SELECT owner, table_name, subpartition_name, BUFFER_POOL
+        FROM dba_ind_subpartitions
+        WHERE partition_name IN (
+          SELECT partition_name
+          FROM dba_partitions
+          WHERE table_owner = UPPER(p_table_owner)
+          AND table_name    = UPPER(p_table_name)
+        )
+        AND BUFFER_POOL != l_inactive_ind_partition_bpool
+      )
+      LOOP
+
+        IF is_inactive_partition(
+          p_table_owner => UPPER(p_table_owner),
+          p_table_name => UPPER(p_table_name),
+          p_partition_name => UPPER(p_partition_name)
+        ) THEN
+          --check syntax
+          EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+            ' MODIFY SUBPARTITION '||x.subpartition_name||' (BUFFER POOL '||l_inactive_tab_partition_bpool||')';
+        END IF;
+
+      END LOOP;
+
+    ELSE
+      --process partitions
+      FOR x IN (
+        SELECT partition_name
+        FROM dba_partitions
+        WHERE table_owner = UPPER(p_table_owner)
+        AND table_name    = UPPER(p_table_name)
+        AND BUFFER_POOL != l_inactive_ind_partition_bpool
+      )
+      LOOP
+
+        IF is_inactive_partition(
+          p_table_owner => UPPER(p_table_owner),
+          p_table_name => UPPER(p_table_name),
+          p_partition_name => UPPER(p_partition_name)
+        ) THEN
+          --check syntax
+          EXECUTE IMMEDIATE 'ALTER TABLE '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)||
+            ' MODIFY PARTITION '||x.partition_name||' (BUFFER POOL '||l_inactive_ind_partition_bpool||')';
+        END IF;
+
+      END LOOP;
+
+    END IF;
+
+    --log_event
+    log_event(
+      p_username   => USER,
+      p_action     => 'COMPRESS_INACTIVE_PARTITIONS',
+      p_message    => 'END '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+    --release lock
+    release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+  END compress_inactive_partitions;
+
+
+  /*
+  Top-level procedure to add, compress, move, readonly, truncate, shrink, drop partititions and tablespaces
+  NB: Be wary of locks being re-requested or released too early - may be re-request them after each step?
+  Set a flag inside calls to indicate that the lock was allocated there and not in a calling procedure
+  */
+  PROCEDURE process_partitions(
+    p_table_owner     IN VARCHAR2,
+    p_table_name      IN VARCHAR2
+  ) IS
+  BEGIN
+    --checks
+    IF NOT check_object_parameters(
+      p_table_owner       => UPPER(p_table_owner),
+      p_table_name        => UPPER(p_table_name),
+      p_object_type       => 'TABLE')
+    ) THEN
+      --this will never trigger because the function will trigger first it validation fails
+      raise_application_error(-20000,'Invalid parameters');
+    END IF;
+
+    --log_event
+    log_event(
+      p_username   => USER,
+      p_action     => 'PROCESS_PARTITIONS',
+      p_message    => 'START '||UPPER(p_table_owner)||'.'||UPPER(p_table_name)
+    );
+
+    --sets lock
+    set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
+    --determine if new partitions need to be pre-allocated based upon the configured parameter
+    WHILE NOT is_preallocated(p_table_owner => p_table_owner, p_table_name => p_table_name) LOOP
+      add_partition(p_table_owner => p_table_owner, p_table_name => p_table_name);
+    END LOOP;
+
+    --if configured, set inactive partitions to use a different buffer pool
+    set_inactive_buffer_pool(p_table_owner => p_table_owner, p_table_name => p_table_name);
+
     /* bulk compress partitions once they are [mostly] inactive, and shrink the tablespace storage */
     --determine if inactive partitions need to be compressed
+    compress_inactive_partitions(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     /* optional feature to move tablespaces to a cheaper slower ASM disk group for archiving
        if all partitions on it are inactive, particularly in the case of rolled up tablespaces */
@@ -954,6 +1276,7 @@ SELECT warehouse_name warehouse,
     /* this is the base case, old partitions older than X are dropped and their tablespace too.
        rolled-up tablespaces (e.g. 1 quartlerly tablespace, 3 monthly partitions) will not be dropped until empty */
     --determine if inactive partitions need to be dropped because they are expired
+    --is_expired_partition()
 
     --release lock
     release_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
