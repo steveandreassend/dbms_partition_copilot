@@ -386,6 +386,59 @@ VALUES (
 );
 COMMIT;
 
+/*
+ALL_TAB_PARTITIONS
+ALL_TAB_SUBPARTITIONS
+
+COMPRESSION:
+  NONE - The partition is composite, and a default setting is not specified for compression.
+  ENABLED - The setting for compression is enabled.
+  DISABLED - The setting for compression is disabled.
+
+COMPRESS_FOR:
+  BASIC
+  ADVANCED
+  QUERY LOW
+  QUERY HIGH
+  ARCHIVE LOW
+  ARCHIVE HIGH
+  NULL
+*/
+
+/*
+DBA_TABLESPACES
+
+  DEF_TAB_COMPRESSION
+    ENABLED - The setting for compression is enabled.
+    DISABLED - The setting for compression is disabled.
+
+  DEF_INDEX_COMPRESSION
+  ENABLED - The setting for compression is enabled.
+  DISABLED - The setting for compression is disabled.
+
+  COMPRESS_FOR:
+    BASIC
+    ADVANCED
+    QUERY LOW
+    QUERY HIGH
+    ARCHIVE LOW
+    ARCHIVE HIGH
+    NULL
+
+  INDEX_COMPRESS_FOR
+    ADVANCED LOW
+    ADVANCED HIGH
+    NULL
+
+  CREATE TABLE sales (
+      prod_id     NUMBER     NOT NULL,
+      cust_id     NUMBER     NOT NULL, ... )
+   PCTFREE 5 NOLOGGING NOCOMPRESS
+   PARTITION BY RANGE (time_id)
+   ( partition sales_2013 VALUES LESS THAN(TO_DATE(...)) ROW STORE COMPRESS BASIC,
+     partition sales_2014 VALUES LESS THAN (MAXVALUE) ROW STORE COMPRESS ADVANCED );
+*/
+
 INSERT INTO DBMS_PARTITION_WRANGLER_PARMS
 (ID, PARAMETER_NAME,DESCRIPTION,PERMITTED_VALUES,MANDATORY,CHANGEABLE)
 VALUES (
