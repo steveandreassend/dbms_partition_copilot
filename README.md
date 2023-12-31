@@ -76,4 +76,4 @@ Restrictions:
 Background Notes:
 
 * What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
-* What is a wrangler: https://en.wikipedia.org/wiki/Wrangler_(profession)
+
