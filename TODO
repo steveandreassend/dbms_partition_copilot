@@ -1,0 +1,13 @@
+
+In Progress:
+is_expired_partition()
+is_inactive_partition()
+process_partitions()
+compress_inactive_partitions()
+rename to dbms_partition_copilot
+
+Issues:
+-subroutines need to check whether to set/release locks if the calling procedure has already done so
+REGEX for COMPRESS_DELAY_DAYS needs to be permit decimals
+Check syntax for ALTER TABLE PARTITION BUFFER POOL
+Compression parameters need to align with 12c-19c options
