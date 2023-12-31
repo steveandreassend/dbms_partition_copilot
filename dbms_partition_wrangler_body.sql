@@ -1,18 +1,4 @@
-/*
-In Progress:
-is_expired_partition()
-is_inactive_partition()
-process_partitions()
-compress_inactive_partitions()
-
-Issues:
--subroutines need to check whether to set/release locks if the calling procedure has already done so
-REGEX for COMPRESS_DELAY_DAYS needs to be permit decimals
-Check syntax for ALTER TABLE PARTITION BUFFER POOL
-Compression parameters need to align with 12c-19c options
-*/
-
-CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
+CREATE OR REPLACE PACKAGE BODY dbms_partition_copilot IS
 
   -- protect against SQL injection
   FUNCTION is_valid_string(
@@ -61,7 +47,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     END IF;
 
     SELECT COUNT(1) INTO l_count
-    FROM dbms_partition_wrangler_parms
+    FROM dbms_partition_copilot_parms
     WHERE PARAMETER_NAME = UPPER(p_parameter);
 
     IF l_count > 0 THEN
@@ -98,7 +84,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
       END IF;
 
       IF NOT is_managed_tablespace(p_tablespace_name => p_tablespace_name) THEN
-        raise_application_error(-20000,'Tablespace is not managed by DBMS_PARTITION_WRANGLER');
+        raise_application_error(-20000,'Tablespace is not managed by dbms_partition_copilot');
       END IF;
 
       RETURN TRUE;
@@ -133,7 +119,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
         raise_application_error(-20000,'Table must be range partitioned');
       END IF;
 
-      --cannot work on a partition if the table isnt registered with DBMS_PARTITION_WRANGLER
+      --cannot work on a partition if the table isnt registered with dbms_partition_copilot
       IF NOT is_registered_table(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
         raise_application_error(-20000,'Table is not registered');
       END IF;
@@ -150,20 +136,20 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_parameter       IN VARCHAR2
   ) RETURN VARCHAR2
   IS
-    l_return dbms_partition_wrangler_settings.SETTING%TYPE;
+    l_return dbms_partition_copilot_settings.SETTING%TYPE;
   BEGIN
 
     SELECT SETTING INTO l_return
-    FROM dbms_partition_wrangler_settings
+    FROM dbms_partition_copilot_settings
     WHERE table_id IN (
       SELECT id
-      FROM dbms_partition_wrangler_tabs
+      FROM dbms_partition_copilot_tabs
       WHERE table_owner = UPPER(p_table_owner)
       AND table_name = UPPER(p_table_name)
     )
     AND PARAMETER_ID IN (
       SELECT ID
-      FROM dbms_partition_wrangler_parms
+      FROM dbms_partition_copilot_parms
       WHERE PARAMETER_NAME = UPPER(p_parameter)
     );
 
@@ -180,7 +166,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
   BEGIN
     /* REVIEW: does mandatory mean nullable??? or do we newed a nullable setting */
     SELECT COUNT(1) INTO l_count
-    FROM dbms_partition_wrangler_parms
+    FROM dbms_partition_copilot_parms
     WHERE mandatory = 'Y';
 
     IF l_count > 0 THEN
@@ -263,7 +249,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     --proceed if unlocked
     --LBYL approach
     IF is_locked(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
-      raise_application_error(-20000,'Table is already locked by dbms_partition_wrangler');
+      raise_application_error(-20000,'Table is already locked by dbms_partition_copilot');
     END IF;
 
     l_lock_name := get_lock_name(p_table_owner => p_table_owner, p_table_name => p_table_name);
@@ -305,7 +291,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
     --only proceed if locked
     IF NOT is_locked(p_table_owner => p_table_owner, p_table_name => p_table_name) THEN
-      raise_application_error(-20000,'Table is not locked by dbms_partition_wrangler');
+      raise_application_error(-20000,'Table is not locked by dbms_partition_copilot');
     END IF;
 
     l_lock_name := get_lock_name(p_table_owner => p_table_owner, p_table_name => p_table_name);
@@ -341,14 +327,14 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END is_range_partitioned;
 
-  --is table managed by dbms_partition_wrangler?
+  --is table managed by dbms_partition_copilot?
   --checks if table already registered
   --WRONG - should check parameter for managed state
   FUNCTION is_managed_table(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
   ) RETURN BOOLEAN IS
-    l_val dbms_partition_wrangler_settings.SETTING%TYPE;
+    l_val dbms_partition_copilot_settings.SETTING%TYPE;
   BEGIN
 
     l_val := get_parameter(
@@ -365,7 +351,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
   END is_managed_table;
 
-  --checks if table already registered with dbms_partition_wrangler
+  --checks if table already registered with dbms_partition_copilot
   FUNCTION is_registered_table(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
@@ -373,7 +359,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     l_count INTEGER;
   BEGIN
     SELECT COUNT(1) INTO l_count
-    FROM dbms_partition_wrangler_tabs
+    FROM dbms_partition_copilot_tabs
     WHERE table_owner = UPPER(p_table_owner)
     AND table_name = UPPER(p_table_name);
 
@@ -413,13 +399,13 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     set_lock(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     --add entry for table
-    INSERT INTO DBMS_PARTITION_WRANGLER_TABS (
+    INSERT INTO dbms_partition_copilot_TABS (
       ID,
       table_owner,
       table_name
     )
     VALUES (
-      SEQ_DBMS_PARTITION_WRANGLER.NEXTVAL,
+      SEQ_dbms_partition_copilot.NEXTVAL,
       UPPER(p_table_owner),
       UPPER(p_table_name)
     );
@@ -471,13 +457,13 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     remove_all_jobs(p_table_owner => p_table_owner, p_table_name => p_table_name);
 
     --delete the table settings
-    DELETE FROM dbms_partition_wrangler_settings
+    DELETE FROM dbms_partition_copilot_settings
     WHERE table_owner = UPPER(p_table_owner)
     AND table_name = UPPER(p_table_name);
     COMMIT;
 
     --delete the table entry
-    DELETE FROM dbms_partition_wrangler_tabs
+    DELETE FROM dbms_partition_copilot_tabs
     WHERE table_owner = UPPER(p_table_owner)
     AND table_name = UPPER(p_table_name);
     COMMIT;
@@ -488,10 +474,10 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
   FUNCTION get_parameter_id(
     p_parameter IN VARCHAR2
   ) RETURN INTEGER IS
-    l_val dbms_partition_wrangler_parms.ID%TYPE;
+    l_val dbms_partition_copilot_parms.ID%TYPE;
   BEGIN
     SELECT ID INTO l_val
-    FROM dbms_partition_wrangler_parms
+    FROM dbms_partition_copilot_parms
     WHERE PARAMETER_NAME = UPPER(p_parameter);
 
     RETURN l_val;
@@ -503,10 +489,10 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_table_owner IN VARCHAR2,
     p_table_name IN VARCHAR2
   ) RETURN INTEGER IS
-    l_val dbms_partition_wrangler_tabs.ID%TYPE;
+    l_val dbms_partition_copilot_tabs.ID%TYPE;
   BEGIN
     SELECT ID INTO l_val
-    FROM dbms_partition_wrangler_tabs
+    FROM dbms_partition_copilot_tabs
     WHERE table_owner = UPPER(p_table_owner)
     AND table_name = UPPER(p_table_name);
 
@@ -522,8 +508,8 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
     p_parameter       IN VARCHAR2,
     p_value           IN VARCHAR2 DEFAULT NULL
   ) IS
-    l_table_id dbms_partition_wrangler_tabs.ID%TYPE;
-    l_parameter_id dbms_partition_wrangler_parms.ID%TYPE;
+    l_table_id dbms_partition_copilot_tabs.ID%TYPE;
+    l_parameter_id dbms_partition_copilot_parms.ID%TYPE;
   BEGIN
     --checks
     IF NOT check_object_parameters(
@@ -563,7 +549,7 @@ CREATE OR REPLACE PACKAGE BODY dbms_partition_wrangler IS
 
     --add the parameter or update it if it exists
     --UPSERT
-    MERGE INTO dbms_partition_wrangler_settings
+    MERGE INTO dbms_partition_copilot_settings
     USING source_table
       ON search_condition
     WHEN MATCHED THEN
@@ -1419,7 +1405,7 @@ FUNCTION count_all_partitions(
 --is_table_owner?
 --invokers rights so that you only modify your table?
 
-  --returns the build version of DBMS_PARTITION_WRANGLER
+  --returns the build version of dbms_partition_copilot
   FUNCTION get_version RETURN VARCHAR2 IS
   BEGIN
     RETURN g_version;
@@ -1474,21 +1460,21 @@ FUNCTION count_all_partitions(
       FROM dba_extents
       WHERE (owner,segment_name) IN (
         SELECT table_owner, table_name
-        FROM dbms_partition_wrangler_tabs
+        FROM dbms_partition_copilot_tabs
       )
     ) OR (
       SELECT tablespace_name
       FROM dba_tab_partitions
       WHERE (table_owner,table_name) IN (
         SELECT table_owner, table_name
-        FROM dbms_partition_wrangler_tabs
+        FROM dbms_partition_copilot_tabs
       )
     ) OR (
       SELECT tablespace_name
       FROM DBA_TAB_SUBPARTITIONS
       WHERE (table_owner,table_name) IN (
         SELECT table_owner, table_name
-        FROM dbms_partition_wrangler_tabs
+        FROM dbms_partition_copilot_tabs
       )
     );
 
@@ -1700,7 +1686,7 @@ FUNCTION count_all_partitions(
     p_table_name      IN VARCHAR2,
     p_tablespace_name IN VARCHAR2
   ) IS
-    l_val dbms_partition_wrangler_settings.SETTING%TYPE;
+    l_val dbms_partition_copilot_settings.SETTING%TYPE;
   BEGIN
     --checks
     IF NOT check_object_parameters(
@@ -1821,7 +1807,7 @@ ALTER DATABASE MOVE DATAFILE '+DATA/ORCL/DATAFILE/EXAMPLE.266.798707687'
     END IF;
   END remove_job;
 
-END dbms_partition_wrangler;
+END dbms_partition_copilot;
 /
 
-CREATE PUBLIC SYNONYM dbms_partition_wrangler FOR dbms_partition_wrangler;
+CREATE PUBLIC SYNONYM dbms_partition_copilot FOR dbms_partition_copilot;
