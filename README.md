@@ -77,4 +77,5 @@ Background Notes:
 
 * What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
 * Get the best out of Oracle Partitioning https://www.oracle.com/docs/tech/partitioning-guide-2703320.pdf
+* Introduction to Very Large Databases https://docs.oracle.com/en/database/oracle/oracle-database/19/vldbg/partition-intro.html#GUID-FBA59FA7-7F42-4039-96D1-ACEC71A07DD5
 
