@@ -76,4 +76,5 @@ Restrictions:
 Background Notes:
 
 * What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
+* Get the best out of Oracle Partitioning https://www.oracle.com/docs/tech/partitioning-guide-2703320.pdf
 
