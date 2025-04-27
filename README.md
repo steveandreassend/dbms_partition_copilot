@@ -8,7 +8,7 @@ Goals:
 * Facilitate the purging of that data when it is no longer of relevance and there is no justification for its retention by the data controller.
 * Facilitate the reduction of online storage, archive storage, backup storage, compute, and electricity consumption that is incurred by hosting the data set.
 * Facilitate performance improvements for the online processing of large data sets by reducing the size of the working set.
-* Encourage the use of security controls such as encrpytion and auditing to protect data.
+* Encourage the use of security controls such as encryption and auditing to protect data.
 
 Intended Audience:
 * Data processors and data controllers in retail, healthcare, telecommunications, utilities, transportation, hospitality, hotels, and financial services, among others, that more often than not store bulk personal data in an Oracle Database.
