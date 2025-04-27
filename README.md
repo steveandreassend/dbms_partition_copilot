@@ -26,9 +26,9 @@ Why:
 
 How:
 
-This package provides an opinionated design for managing RANGE partitions in a package called DBMS_PARTITION_WRANGLER.
+This package provides an opinionated design for managing RANGE partitions in a package called DBMS_PARTITION_COPILOT.
 RANGE partitioning is the most common partitioning method employed in the field. It can be combined with sub-partitioning with LIST and HASH partitioning whereby the top-level RANGE partitioning provides the metadata, and the sub-partitionins provide the physical storage. The intention wit this API is to leverage Oracle's built-in capabilities and in some cases improve upon the newer extensions provided.
-See the worked examples in Examples.txt to learn how to use DBMS_PARTITION_WRANGLER.
+See the worked examples in Examples.txt to learn how to use DBMS_PARTITION_COPILOT.
 
 Compatibility:
 
