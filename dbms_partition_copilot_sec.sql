@@ -3,82 +3,82 @@ WHENEVER OSERROR EXIT 1;
 
 CONNECT / AS SYSDBA
 
-PROMPT Create role DBMS_PARTITION_WRANGLER_ADMIN to permit users to manage their partitions
-CREATE ROLE DBMS_PARTITION_WRANGLER_ADMIN;
+PROMPT Create role DBMS_PARTITION_COPILOT_ADMIN to permit users to manage their partitions
+CREATE ROLE DBMS_PARTITION_COPILOT_ADMIN;
 
-PROMPT Create role DBMS_PARTITION_WRANGLER_ADMIN to permit users to view partition status
-CREATE ROLE DBMS_PARTITION_WRANGLER_VIEWER;
+PROMPT Create role DBMS_PARTITION_COPILOT_ADMIN to permit users to view partition status
+CREATE ROLE DBMS_PARTITION_COPILOT_VIEWER;
 
-GRANT EXECUTE ON DBMS_PARTITION_WRANGLER TO DBMS_PARTITION_WRANGLER_ADMIN;
+GRANT EXECUTE ON DBMS_PARTITION_COPILOT TO DBMS_PARTITION_COPILOT_ADMIN;
 
 PROMPT Configuring package auditing...
 
-CREATE AUDIT POLICY AUD_PKG_dbms_partition_wrangler
- ACTIONS EXECUTE, GRANT ON dbms_partition_wrangler;
+CREATE AUDIT POLICY AUD_PKG_dbms_partition_copilot
+ ACTIONS EXECUTE, GRANT ON dbms_partition_copilot;
 
-AUDIT POLICY AUD_PKG_dbms_partition_wrangler;
+AUDIT POLICY AUD_PKG_dbms_partition_copilot;
 
-SELECT dbms_partition_wrangler.get_version FROM DUAL;
+SELECT dbms_partition_copilot.get_version FROM DUAL;
 
 set lines 400 pages 1000
 
 SELECT ACTION_NAME, DBUSERNAME, EVENT_TIMESTAMP, UNIFIED_AUDIT_POLICIES, SQL_TEXT
 FROM UNIFIED_AUDIT_TRAIL
 WHERE OBJECT_SCHEMA = 'SYS'
-AND OBJECT_NAME = UPPER('dbms_partition_wrangler')
+AND OBJECT_NAME = UPPER('DBMS_PARTITION_COPILOT')
 AND EVENT_TIMESTAMP > SYSDATE-(1/24)
 ORDER BY EVENT_TIMESTAMP ASC;
 
-PROMPT Configure dbms_partition_wrangler_tabs auditing...
+PROMPT Configure dbms_partition_copilot_tabs auditing...
 
-CREATE AUDIT POLICY AUD_TAB_dbms_partition_wrangler_tabs
- ACTIONS ALL ON dbms_partition_wrangler_tabs;
+CREATE AUDIT POLICY AUD_TAB_dbms_partition_copilot_tabs
+ ACTIONS ALL ON dbms_partition_copilot_tabs;
 
-AUDIT POLICY AUD_TAB_dbms_partition_wrangler;
+AUDIT POLICY AUD_TAB_dbms_partition_copilot;
 
-SELECT * FROM dbms_partition_wrangler;
+SELECT * FROM dbms_partition_copilot;
 
 set lines 400 pages 1000
 
 SELECT ACTION_NAME, DBUSERNAME, EVENT_TIMESTAMP, UNIFIED_AUDIT_POLICIES, SQL_TEXT
 FROM UNIFIED_AUDIT_TRAIL
 WHERE OBJECT_SCHEMA = 'SYS'
-AND OBJECT_NAME = 'DBMS_PARTITION_WRANGLER_TABS'
+AND OBJECT_NAME = UPPER('DBMS_PARTITION_COPILOT_TABS')
 AND EVENT_TIMESTAMP > SYSDATE-(1/24)
 ORDER BY EVENT_TIMESTAMP ASC;
 
-PROMPT Configure dbms_partition_wrangler_settings auditing...
+PROMPT Configure dbms_partition_copilot_settings auditing...
 
-CREATE AUDIT POLICY AUD_TAB_dbms_partition_wrangler_settings
- ACTIONS ALL ON dbms_partition_wrangler_settings;
+CREATE AUDIT POLICY AUD_TAB_dbms_partition_copilot_settings
+ ACTIONS ALL ON dbms_partition_copilot_settings;
 
-AUDIT POLICY AUD_TAB_dbms_partition_wrangler_settings;
+AUDIT POLICY AUD_TAB_dbms_partition_copilot_settings;
 
-SELECT * FROM dbms_partition_wrangler_settings;
+SELECT * FROM dbms_partition_copilot_settings;
 
 set lines 400 pages 1000
 
 SELECT ACTION_NAME, DBUSERNAME, EVENT_TIMESTAMP, UNIFIED_AUDIT_POLICIES, SQL_TEXT
 FROM UNIFIED_AUDIT_TRAIL
 WHERE OBJECT_SCHEMA = 'SYS'
-AND OBJECT_NAME = 'DBMS_PARTITION_WRANGLER_SETTINGS'
+AND OBJECT_NAME = UPPER('DBMS_PARTITION_COPILOT_SETTINGS')
 AND EVENT_TIMESTAMP > SYSDATE-(1/24)
 ORDER BY EVENT_TIMESTAMP ASC;
 
-PROMPT Configure dbms_partition_wrangler_parms auditing...
+PROMPT Configure dbms_partition_copilot_parms auditing...
 
-CREATE AUDIT POLICY AUD_TAB_dbms_partition_wrangler_parms
- ACTIONS ALL ON dbms_partition_wrangler_parms;
+CREATE AUDIT POLICY AUD_TAB_dbms_partition_copilot_parms
+ ACTIONS ALL ON dbms_partition_copilot_parms;
 
-AUDIT POLICY AUD_TAB_dbms_partition_wrangler_parms;
+AUDIT POLICY AUD_TAB_dbms_partition_copilot_parms;
 
-SELECT * FROM dbms_partition_wrangler_parms;
+SELECT * FROM dbms_partition_copilot_parms;
 
 set lines 400 pages 1000
 
 SELECT ACTION_NAME, DBUSERNAME, EVENT_TIMESTAMP, UNIFIED_AUDIT_POLICIES, SQL_TEXT
 FROM UNIFIED_AUDIT_TRAIL
 WHERE OBJECT_SCHEMA = 'SYS'
-AND OBJECT_NAME = 'DBMS_PARTITION_WRANGLER_PARMS'
+AND OBJECT_NAME = UPPER('DBMS_PARTITION_COPILOT_PARMS')
 AND EVENT_TIMESTAMP > SYSDATE-(1/24)
 ORDER BY EVENT_TIMESTAMP ASC;

@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
+CREATE OR REPLACE PACKAGE dbms_partition_copilot IS
 
   g_version VARCHAR2(10) := '1.0';
 
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
     p_table_name      IN VARCHAR2
   );
 
-  --is table managed by dbms_partition_wrangler?
+  --is table managed by dbms_partition_copilot?
   FUNCTION is_managed_table(
     p_table_owner     IN VARCHAR2,
     p_table_name      IN VARCHAR2
@@ -153,8 +153,8 @@ CREATE OR REPLACE PACKAGE dbms_partition_wrangler IS
     p_table_name      IN VARCHAR2
   ) RETURN INTEGER;
 
-  --returns the build version of DBMS_PARTITION_WRANGLER
+  --returns the build version of dbms_partition_copilot
   FUNCTION get_version RETURN VARCHAR2;
 
-END dbms_partition_wrangler;
+END dbms_partition_copilot;
 /

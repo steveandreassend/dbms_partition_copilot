@@ -21,7 +21,7 @@ Why:
 * To reduce the energy footprint of storing and processing bulk data by avoiding unnecessary and excessive resource consumption. Data centers are large energy consumers and in many countries they are powered by fossil fuels, responsible for an estimated 3% of greenhouse gas emissions.
 * Most databases are not secure. In 2018 it was claimed by one commentator that only 1% of the databases in the world are encrypted.
 * Because partitioning offers the potential for performance gains in the orders of magnitude by shrinking the size of the working data set size.
-* Why a wrangler? Because partitions need to be managed with care. Handling must be orchestrated by policy and fully automated to prevent human error.
+* Because partitions need to be managed with care. Handling must be orchestrated by policy and fully automated to prevent human error.
 * Why FOSS? This project is intended as a benefit to a society and so the code can be subject to scrutiny, testing, contributions, and adoption by the community. It is provided here under the MIT license.
 
 How:
@@ -78,4 +78,3 @@ Background Notes:
 * What is Oracle Partitioning: https://www.oracle.com/docs/tech/database/partitioning-technical-brief-12c.pdf
 * Get the best out of Oracle Partitioning https://www.oracle.com/docs/tech/partitioning-guide-2703320.pdf
 * Introduction to Very Large Databases https://docs.oracle.com/en/database/oracle/oracle-database/19/vldbg/partition-intro.html#GUID-FBA59FA7-7F42-4039-96D1-ACEC71A07DD5
-
