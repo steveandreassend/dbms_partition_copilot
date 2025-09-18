@@ -1,12 +1,12 @@
 sqlplus / AS SYSDBA
 
 PROMPT Grant access to the user that stores the schema objects for the application
-GRANT DBMS_PARTITION_COPILOT_ADMIN TO MYSCHEMA1;
+GRANT dbms_partition_copilot_ADMIN TO MYSCHEMA1;
 
 CONNECT MYSCHEMA1/
 
 PROMPT What version is installed?
-SELECT DBMS_PARTITION_COPILOT.get_version FROM DUAL;
+SELECT dbms_partition_copilot.get_version FROM DUAL;
 
 PROMPT A range partitioned table MYPARTTAB1 already exists
 
@@ -15,24 +15,24 @@ SET SERVEROUTPUT ON SIZE 32000
 PROMPT Register the table and set parameters
 BEGIN
   -- Register the table
-  DBMS_PARTITION_COPILOT.register_table('MYSCHEMA1','MYPARTTAB1');
+  dbms_partition_copilot.register_table('MYSCHEMA1','MYPARTTAB1');
 
   -- All partitions and tablespaces are named MYPARTTAB1_WW_YYYY
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'NAME_PREFIX',
     p_value        => 'MYPARTTAB1'
   );
 
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'MANAGED',
     p_value        => 'Y'
   );
 
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'TABLE_RANGE_TYPE',
@@ -40,7 +40,7 @@ BEGIN
   );
 
   -- Store each partition in a dedicated tablespace
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'TABLESPACE_RANGE_TYPE',
@@ -48,7 +48,7 @@ BEGIN
   );
 
   -- Store partitions in the +DATA ASM disk group
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'ACTIVE_ASM_DISKGROUP',
@@ -56,7 +56,7 @@ BEGIN
   );
 
   -- When partitions become inactive, move them to the +DATA2 ASM disk group
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'INACTIVE_ASM_DISKGROUP',
@@ -64,7 +64,7 @@ BEGIN
   );
 
   -- Make sure there is always 2 weeks of partitions pre-allocated
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'PREALLOCATED_PARTITIONS',
@@ -72,7 +72,7 @@ BEGIN
   );
 
   -- Retain 12 weeks of inactive partitions
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'INACTIVE_PARTITIONS',
@@ -80,7 +80,7 @@ BEGIN
   );
 
   -- Compress inactive partitions
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'COMPRESSION_INACTIVE',
@@ -88,7 +88,7 @@ BEGIN
   );
 
   -- Compress active and pre-allocated partitions
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'COMPRESSION_ACTIVE',
@@ -96,7 +96,7 @@ BEGIN
   );
 
   -- New BIGFILE tablespaces are created with a starting size of 1G
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'TABLESPACE_MINSIZE',
@@ -104,7 +104,7 @@ BEGIN
   );
 
   -- All DDL operations to manage partitions use parallelism degree 16
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'DDL_PARALLEL_DEGREE',
@@ -112,7 +112,7 @@ BEGIN
   );
 
   -- When partitions become inactive, set the tablespace to read-only so that RMAN only backs it up once
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'READONLY_INACTIVE',
@@ -120,7 +120,7 @@ BEGIN
   );
 
     -- Encryption for new tablespaces
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'TABLESPACE_ENCRYPTION',
@@ -128,7 +128,7 @@ BEGIN
   );
 
   -- Configure NOLOGGING for COMPRESS operations
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'REDO_LOGGING',
@@ -136,7 +136,7 @@ BEGIN
   );
 
     -- Specify a 7 day delay for compression to be applied after a partition becomes inactive
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'COMPRESS_DELAY_DAYS',
@@ -144,7 +144,7 @@ BEGIN
   );
 
   -- Permit ENABLE ROW MOVEMENT for up to 21 days after a partition becomes inactive
-  DBMS_PARTITION_COPILOT.modify_table(
+  dbms_partition_copilot.modify_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1',
     p_parameter    => 'READONLY_DELAY_DAYS',
@@ -152,7 +152,7 @@ BEGIN
   );
 
   -- activate the management of the table and create the automatic maintenance jobs
-  DBMS_PARTITION_COPILOT.set_managed_table(
+  dbms_partition_copilot.set_managed_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1'
   );
@@ -161,13 +161,13 @@ END;
 /
 
 PROMPT Get configuration settings and DBMS_SCHEDULER jobs for this table
-EXECUTE DBMS_PARTITION_COPILOT.report_table('MYSCHEMA1','MYPARTTAB1');
+EXECUTE dbms_partition_copilot.report_table('MYSCHEMA1','MYPARTTAB1');
 
 PROMPT Verify the configuration
 DECLARE
   l_out INTEGER;
 BEGIN
-  DBMS_PARTITION_COPILOT.check_table(
+  dbms_partition_copilot.check_table(
     p_table_owner  => 'MYSCHEMA1',
     p_table_name   => 'MYPARTTAB1'
     p_return_code  => l_out
@@ -177,28 +177,28 @@ END;
 /
 
 PROMPT Count preallocated partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count historical partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count active partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count active partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Manually run the add and drop of partitions
-EXECUTE DBMS_PARTITION_COPILOT.process_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+EXECUTE dbms_partition_copilot.process_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count preallocated partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_preallocated_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count historical partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_historical_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count active partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_active_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
 
 PROMPT Count active partitions for a specified managed table
-SELECT DBMS_PARTITION_COPILOT.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
+SELECT dbms_partition_copilot.count_all_partitions('MYSCHEMA1','MYPARTTAB1') FROM DUAL;
